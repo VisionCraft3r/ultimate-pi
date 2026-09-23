@@ -17,9 +17,6 @@ jobs:
         with:
           node-version: "22.x"
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run scan
       - name: Install tmux (Ubuntu)
         if: runner.os == 'Linux'
         run: |
@@ -33,4 +30,7 @@ jobs:
           if ! command -v tmux; then
             brew install tmux
           fi
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run scan
       - run: npm run smoke
