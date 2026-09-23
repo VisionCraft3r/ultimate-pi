@@ -63,6 +63,9 @@ falls back to the remaining tools rather than blocking the session.
 - Node.js `>=22.19.0`, `git`, `tmux`.
 - At least one configured model provider (Anthropic, OpenAI Codex, Cursor,
   OpenRouter, DeepSeek, OpenAI, or another OpenAI-compatible provider).
+- Browser/QA tools (`qa_tester`, `browser_*`) need Chromium installed separately:
+  `npx playwright-core install chromium`. See
+  [extensions/browser/README.md](./extensions/browser/README.md) for details.
 - Optional: an OpenRouter API key (for JEV routing), a DeepSeek API key (for
   observational memory), a Google Custom Search key/CSE id (for `web_search`),
   and `python3` / `yt-dlp` (for the bundled skills).
@@ -227,6 +230,9 @@ Flags:
   --dry-run            Print actions without writing
   --offline            Skip network checks and live probes
   --local              Pi settings scope (local project), not package source
+  --full, --purge      Uninstall only: also remove model-agents.json and third-party
+                       packages Ultimate Pi installed. Never deletes auth.json.
+                       Default uninstall without this flag stays conservative.
   --no-color           Disable ANSI color
   -h, --help           Show this help
 ```

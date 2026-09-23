@@ -1,6 +1,6 @@
 {
   "name": "ultimate-pi",
-  "version": "0.1.0",
+  "version": "1.0.0-alpha",
   "description": "Multi-agent routing for the Pi CLI.",
   "type": "module",
   "license": "MIT",

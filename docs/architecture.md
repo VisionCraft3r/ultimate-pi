@@ -90,17 +90,17 @@ Example shape:
 ```json
 {
   "fallbacks": {
-    "anthropic": ["openai-codex/gpt-5.6-sol", "cursor/cursor-grok-4.6-xhigh"],
-    "openai-codex": ["anthropic/claude-sonnet-5", "cursor/cursor-grok-4.6-xhigh"],
-    "cursor": ["openai-codex/gpt-5.6-sol", "anthropic/claude-sonnet-5"]
+    "anthropic": ["openai-codex/gpt-5.4", "cursor/composer-1.5"],
+    "openai-codex": ["anthropic/claude-sonnet-4.6", "cursor/composer-1.5"],
+    "cursor": ["openai-codex/gpt-5.4", "anthropic/claude-sonnet-4.6"]
   },
   "agentFallbacks": {
-    "worker": ["anthropic/claude-sonnet-5"]
+    "worker": ["anthropic/claude-sonnet-4.6"]
   }
 }
 ```
 
-On a 429 for a `worker` using Anthropic, that file would try `agentFallbacks.worker` first (`anthropic/claude-sonnet-5` — already on Anthropic, so the next step still matters if *that* call 429s), then `fallbacks.anthropic`, then the derived default. Reconfigure any time with `ultimate-pi setup fallbacks` or the in-Pi `/ModelAgents` command.
+On a 429 for a `worker` using Anthropic, that file would try `agentFallbacks.worker` first (`anthropic/claude-sonnet-4.6` — already on Anthropic, so the next step still matters if *that* call 429s), then `fallbacks.anthropic`, then the derived default. Reconfigure any time with `ultimate-pi setup fallbacks` or the in-Pi `/ModelAgents` command.
 
 ## Planner handoff
 

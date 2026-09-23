@@ -3,11 +3,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { preflight } from "./preflight.mjs";
-import { collectProviders } from "./providers.mjs";
+import { collectProviders, yesModeAuthError } from "./providers.mjs";
 import { assignAgentModels } from "./agents.mjs";
 import { configureFallbacks } from "./fallbacks.mjs";
 import { configurePackagesAndKeys } from "./packages.mjs";
-import { mergeCredentials } from "./auth-store.mjs";
+import { mergeCredentials, readAuth } from "./auth-store.mjs";
 import { applySettings } from "./settings.mjs";
 import { configureExtras } from "./extras.mjs";
 import { doctor } from "./doctor.mjs";
@@ -60,11 +60,21 @@ export async function install(rawOptions) {
 
   const preflightReport = preflight(options);
   if (!preflightReport.ok && !options.dryRun) {
-    console.error("Preflight failed — fix the ✖ items above and re-run.");
+    console.error("Preflight failed — install the missing prerequisites above and re-run.");
     return 1;
   }
 
   const { providers } = await collectProviders(options);
+
+  if (options.yes && !options.dryRun) {
+    const existingAuth = await readAuth(options.agentDir).catch(() => ({}));
+    const authError = yesModeAuthError(providers, existingAuth);
+    if (authError) {
+      console.error(authError);
+      return 1;
+    }
+  }
+
   const agentAssignments = await assignAgentModels(options, providers);
   const { providerChains, agentFallbacks } = await configureFallbacks(options, providers, agentAssignments);
   const { keys, jev, memory, packages } = await configurePackagesAndKeys(options, providers, agentAssignments);

@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -66,6 +66,52 @@ function assertAnswerPackageSources(entries) {
   throw new Error(
     `answers.packages must use documented Pi source specs (npm:, git:, https://, ssh://, or an absolute/relative local path). Rejected bare or undocumented name(s) before pi install: ${listed}`,
   );
+}
+
+function isGitSource(spec) {
+  return typeof spec === "string" && spec.startsWith("git:");
+}
+
+export function gitSourceSpecs(specs) {
+  return [...new Set((specs ?? []).filter(isGitSource))];
+}
+
+function gitIsAvailable() {
+  try {
+    execFileSync("git", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function gitMissingMessage(gitSpecs) {
+  const listed = gitSpecs.join(", ");
+  const hasRequired = gitSpecs.some(
+    (spec) =>
+      spec.startsWith("git:github.com/amosblomqvist/pi-interactive-subagents") ||
+      spec.startsWith("git:github.com/VisionCraft3r/ultimate-pi"),
+  );
+  if (hasRequired) {
+    return (
+      `git is required for git-based package(s): ${listed}. Install git and re-run. ` +
+      "Optional git packages (for example observational memory) can be omitted from answers.packages, " +
+      "but required packages such as pi-interactive-subagents cannot be skipped."
+    );
+  }
+  return (
+    `git is required for optional git-based package(s): ${listed}. Install git and re-run, ` +
+    "or omit these from answers.packages / skip observational memory."
+  );
+}
+
+/** Fail before `pi install` of any git: spec when `git` is not on PATH. */
+export function assertGitAvailableForSpecs(specs, options = {}, isAvailable = gitIsAvailable) {
+  if (options.dryRun || options.offline) return;
+  const gitSpecs = gitSourceSpecs(specs);
+  if (gitSpecs.length === 0) return;
+  if (isAvailable()) return;
+  throw new Error(gitMissingMessage(gitSpecs));
 }
 
 function runPiInstall(spec) {
@@ -180,6 +226,7 @@ export async function configurePackagesAndKeys(
   if (ids.includes("cursor")) packages.push("npm:@schultzp2020/pi-cursor");
 
   const unique = [...new Set(packages)];
+  assertGitAvailableForSpecs(unique, options);
   for (const spec of unique) {
     await installSpec(spec, options);
   }

@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { htmlToMarkdown, pdfToMarkdown } from "./convert.ts";
 
-export const USER_AGENT = "Mozilla/5.0 (compatible; ultimate-pi/0.1.0)";
+export const USER_AGENT = "Mozilla/5.0 (compatible; ultimate-pi/1.0.0-alpha)";
 
 const TIMEOUT_MS = 30_000;
 const MAX_BYTES = 5 * 1024 * 1024;

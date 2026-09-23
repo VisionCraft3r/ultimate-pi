@@ -75,7 +75,7 @@ Local/custom. Nearby packages (`@tylerho/pi-web-fetch`, `@m4ss/pi-web-fetch`) sh
 - `unpdf` (MIT)
 - Jina Reader (`https://r.jina.ai/`) is an optional remote fallback, not a vendored work
 
-User-Agent is the generic `Mozilla/5.0 (compatible; ultimate-pi/0.1.0)` (not OS-specific).
+User-Agent is the generic `Mozilla/5.0 (compatible; ultimate-pi/1.0.0-alpha)` (not OS-specific).
 
 ### `extensions/web-search/`
 

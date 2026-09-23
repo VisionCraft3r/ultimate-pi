@@ -21,6 +21,9 @@ Flags:
   --dry-run            Print actions without writing
   --offline            Skip network checks and live probes
   --local              Pi settings scope (local project), not package source
+  --full, --purge      Uninstall only: also remove model-agents.json and third-party
+                       packages Ultimate Pi installed. Never deletes auth.json.
+                       Default uninstall without this flag stays conservative.
   --no-color           Disable ANSI color
   -h, --help           Show this help`);
   process.exit(code);
@@ -42,6 +45,8 @@ export function parseArgs(argv) {
     dryRun: false,
     offline: false,
     local: false,
+    full: false,
+    purge: false,
     noColor: Boolean(process.env.NO_COLOR),
     command: "install",
     setupTopic: null,
@@ -55,6 +60,10 @@ export function parseArgs(argv) {
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--offline") options.offline = true;
     else if (arg === "--local") options.local = true;
+    else if (arg === "--full" || arg === "--purge") {
+      options.full = true;
+      options.purge = true;
+    }
     else if (arg === "--no-color") options.noColor = true;
     else if (arg === "--agent-dir") options.agentDir = resolve(needValue(argv, ++i, arg));
     else if (arg.startsWith("--agent-dir=")) options.agentDir = resolve(arg.slice(12));

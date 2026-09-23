@@ -18,6 +18,9 @@ npm install
 npx playwright-core install chromium    # one-time browser binary download (~150MB)
 ```
 
+`qa_tester` / `browser_*` tools fail until this Chromium install has been run.
+The same requirement is listed in the top-level [README](../../README.md#requirements).
+
 Then `/reload` inside pi (or restart). The tools (`browser_goto`,
 `browser_eval`, …) appear in `pi.getAllTools()` when this extension is loaded.
 

@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
+import { DEFAULT_MODELS_BY_PROVIDER, canonicalizeAnswersFields } from "./schema.mjs";
 
-const REQUIRED_TOP_LEVEL = ["providers", "agentAssignments"];
+function catalogId(provider, index = 0) {
+  return DEFAULT_MODELS_BY_PROVIDER[provider][index];
+}
 
 function defaultAnswers() {
   return {
@@ -15,25 +18,42 @@ function defaultAnswers() {
   };
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function assertShape(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("answers file must contain a single JSON object");
   }
-  for (const field of REQUIRED_TOP_LEVEL) {
-    if (!(field in data)) {
-      throw new Error(`answers file is missing required field "${field}"`);
-    }
+  if (!("providers" in data)) {
+    throw new Error('answers file is missing required field "providers"');
   }
   if (!Array.isArray(data.providers)) {
-    throw new Error('answers.providers must be an array of { id, authMethod, credential? }');
+    throw new Error("answers.providers must be an array of { id, authMethod, credential? }");
   }
   for (const provider of data.providers) {
     if (!provider || typeof provider !== "object" || typeof provider.id !== "string") {
-      throw new Error('each entry in answers.providers needs at least { id: string }');
+      throw new Error("each entry in answers.providers needs at least { id: string }");
     }
   }
-  if (typeof data.agentAssignments !== "object" || Array.isArray(data.agentAssignments)) {
-    throw new Error('answers.agentAssignments must be an object keyed by agent name, e.g. { scout: { provider, model } }');
+
+  const hasAssignments = isPlainObject(data.agentAssignments);
+  const hasAlias = isPlainObject(data.agentModels);
+  if ("agentAssignments" in data && !hasAssignments) {
+    throw new Error(
+      "answers.agentAssignments must be an object keyed by agent name, e.g. { scout: { provider, model } }",
+    );
+  }
+  if ("agentModels" in data && !hasAlias) {
+    throw new Error(
+      "answers.agentModels must be an object keyed by agent name, e.g. { scout: { provider, model } }",
+    );
+  }
+  if (!hasAssignments && !hasAlias) {
+    throw new Error(
+      'answers file is missing required field "agentAssignments" (alias: "agentModels")',
+    );
   }
 }
 
@@ -41,6 +61,9 @@ function assertShape(data) {
  * Load and validate a non-interactive answers file (the --answers <file> flag).
  * Fills in sane defaults for optional fields; throws a clear error naming the
  * missing/invalid field for anything required.
+ *
+ * Canonical keys are agentAssignments + top-level providerChains/agentFallbacks.
+ * agentModels and nested fallbacks.* are accepted as aliases and normalized here.
  */
 export async function loadAnswers(filePath) {
   let raw;
@@ -62,18 +85,23 @@ export async function loadAnswers(filePath) {
 
   assertShape(parsed);
 
+  const defaults = defaultAnswers();
+  const canonical = canonicalizeAnswersFields(parsed);
+
   return {
-    ...defaultAnswers(),
+    ...defaults,
     ...parsed,
-    providerChains: { ...defaultAnswers().providerChains, ...(parsed.providerChains ?? {}) },
-    agentFallbacks: { ...defaultAnswers().agentFallbacks, ...(parsed.agentFallbacks ?? {}) },
-    extras: { ...defaultAnswers().extras, ...(parsed.extras ?? {}) },
+    agentAssignments: { ...defaults.agentAssignments, ...canonical.agentAssignments },
+    providerChains: { ...defaults.providerChains, ...canonical.providerChains },
+    agentFallbacks: { ...defaults.agentFallbacks, ...canonical.agentFallbacks },
+    extras: { ...defaults.extras, ...(parsed.extras ?? {}) },
   };
 }
 
 /**
  * Write an example/skeleton answers.json so users can hand-author one for
  * non-interactive installs (`ultimate-pi install --answers my-answers.json --yes`).
+ * Model ids are taken from DEFAULT_MODELS_BY_PROVIDER so copy-paste resolves.
  */
 export async function writeAnswersTemplate(filePath) {
   const template = {
@@ -82,18 +110,21 @@ export async function writeAnswersTemplate(filePath) {
       { id: "openrouter", authMethod: "api_key", credential: "<your-openrouter-api-key>" },
     ],
     agentAssignments: {
-      scout: { provider: "cursor", model: "cursor-grok-4.6-medium" },
-      worker: { provider: "cursor", model: "cursor-grok-4.6-xhigh" },
-      planner: { provider: "anthropic", model: "claude-opus-5-5" },
-      researcher: { provider: "openai-codex", model: "gpt-6-sol" },
-      qa_tester: { provider: "cursor", model: "cursor-grok-4.6-medium" },
+      scout: { provider: "cursor", model: catalogId("cursor", 0) },
+      worker: { provider: "cursor", model: catalogId("cursor", 1) },
+      planner: { provider: "anthropic", model: catalogId("anthropic", 1) },
+      researcher: { provider: "openai-codex", model: catalogId("openai-codex", 0) },
+      qa_tester: { provider: "cursor", model: catalogId("cursor", 0) },
     },
+    // Top-level providerChains (not nested under fallbacks) — matches schema.mjs
+    // and settings.mjs. Nested answers.fallbacks.providerChains is still accepted
+    // as an alias by canonicalizeAnswersFields.
     providerChains: {
-      anthropic: [{ provider: "openai-codex", id: "gpt-6-sol" }],
-      "openai-codex": [{ provider: "anthropic", id: "claude-sonnet-5" }],
+      anthropic: [{ provider: "openai-codex", id: catalogId("openai-codex", 0) }],
+      "openai-codex": [{ provider: "anthropic", id: catalogId("anthropic", 0) }],
       cursor: [
-        { provider: "openai-codex", id: "gpt-6-sol" },
-        { provider: "anthropic", id: "claude-sonnet-5" },
+        { provider: "openai-codex", id: catalogId("openai-codex", 0) },
+        { provider: "anthropic", id: catalogId("anthropic", 0) },
       ],
     },
     agentFallbacks: {},

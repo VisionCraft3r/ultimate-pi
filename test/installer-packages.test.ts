@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { configurePackagesAndKeys } from "../installer/packages.mjs";
+import { configurePackagesAndKeys, assertGitAvailableForSpecs, gitMissingMessage } from "../installer/packages.mjs";
 import { doctor } from "../installer/doctor.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -86,4 +86,55 @@ test("doctor --offline checks settings source specs and ✖ when lens or graft i
   } finally {
     await rm(agentDir, { recursive: true, force: true });
   }
+});
+
+test("doctor empty auth.json tells the user to pi login then re-run install", async () => {
+  const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-auth-"));
+  try {
+    const report = await doctor({ agentDir, offline: true });
+    const authCheck = report.checks.find((check) => check.label === "provider auth");
+    assert.equal(authCheck?.ok, false);
+    assert.match(authCheck?.detail ?? "", /no providers configured/);
+    assert.match(authCheck?.detail ?? "", /pi login/);
+    assert.match(authCheck?.detail ?? "", /ultimate-pi setup providers/);
+  } finally {
+    await rm(agentDir, { recursive: true, force: true });
+  }
+});
+
+test("assertGitAvailableForSpecs fails clearly when git is missing for a git: package", () => {
+  assert.throws(
+    () =>
+      assertGitAvailableForSpecs(
+        ["git:github.com/amosblomqvist/pi-interactive-subagents@abc"],
+        {},
+        () => false,
+      ),
+    (error) => {
+      assert.match(String(error), /git is required/);
+      assert.match(String(error), /pi-interactive-subagents/);
+      assert.match(String(error), /cannot be skipped/);
+      assert.doesNotMatch(String(error), /--minimal/);
+      return true;
+    },
+  );
+});
+
+test("assertGitAvailableForSpecs skips the check when offline, dry-run, or no git: specs", () => {
+  assert.doesNotThrow(() =>
+    assertGitAvailableForSpecs(["git:github.com/example/pkg"], { offline: true }, () => false),
+  );
+  assert.doesNotThrow(() =>
+    assertGitAvailableForSpecs(["git:github.com/example/pkg"], { dryRun: true }, () => false),
+  );
+  assert.doesNotThrow(() =>
+    assertGitAvailableForSpecs(["npm:pi-lens", "npm:pi-graft"], {}, () => false),
+  );
+});
+
+test("gitMissingMessage for optional-only git packages points at answers.packages, not a new flag", () => {
+  const message = gitMissingMessage(["git:github.com/amosblomqvist/pi-observational-memory"]);
+  assert.match(message, /optional git-based package/);
+  assert.match(message, /answers\.packages/);
+  assert.doesNotMatch(message, /--minimal/);
 });

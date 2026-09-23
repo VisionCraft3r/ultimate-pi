@@ -6,6 +6,11 @@ import {
   AGENTS_MD_END,
   MANAGED_AGENT_MARKER,
 } from "./schema.mjs";
+import {
+  describeRemainingBackups,
+  removeModelAgentsJson,
+  wantsFullUninstall,
+} from "./uninstall-package.mjs";
 
 const AGENTS_MD_FILE = "AGENTS.md";
 
@@ -100,10 +105,12 @@ export async function removeManagedAgentProfiles(agentDir, backupSession, option
   }
 
   if (options.dryRun) {
-    return { removed: planned, dryRun: true };
+    const extra = await fullManagedExtras(agentDir, backupSession, options);
+    return { removed: planned, dryRun: true, ...extra };
   }
   if (planned.length === 0) {
-    return { removed: planned };
+    const extra = await fullManagedExtras(agentDir, backupSession, options);
+    return { removed: planned, ...extra };
   }
 
   if (typeof backupSession?.backupIfExists !== "function") {
@@ -115,5 +122,21 @@ export async function removeManagedAgentProfiles(agentDir, backupSession, option
     await backupSession.backupIfExists(relPath);
     await fs.unlink(path.join(agentDir, relPath));
   }
-  return { removed: planned };
+  const extra = await fullManagedExtras(agentDir, backupSession, options);
+  return { removed: planned, ...extra };
+}
+
+async function fullManagedExtras(agentDir, backupSession, options) {
+  if (!wantsFullUninstall(options)) return {};
+  const modelAgents = await removeModelAgentsJson(agentDir, backupSession, options);
+  const backupsNote = await describeRemainingBackups(agentDir);
+  if (!options.dryRun) {
+    console.log(backupsNote);
+  } else {
+    console.log(`[dry-run] ${backupsNote}`);
+  }
+  return {
+    modelAgentsRemoved: Boolean(modelAgents.removed),
+    backupsNote,
+  };
 }

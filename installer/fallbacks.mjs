@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts";
+import { canonicalizeAnswersFields } from "./schema.mjs";
 
 const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester"];
 const SESSIONS = ["main", ...AGENT_NAMES];
@@ -71,12 +72,11 @@ function reviewTable(providerIds, providerChains, agentAssignments, agentFallbac
 }
 
 function fromAnswers(answers) {
-  const fb = answers?.fallbacks;
-  if (!fb?.providerChains) return null;
-  return {
-    providerChains: fb.providerChains,
-    agentFallbacks: fb.agentFallbacks ?? {},
-  };
+  // Canonical answers.json shape is top-level providerChains / agentFallbacks
+  // (schema.mjs, settings.mjs). Nested answers.fallbacks.providerChains is an alias.
+  const { providerChains, agentFallbacks } = canonicalizeAnswersFields(answers);
+  if (!providerChains || Object.keys(providerChains).length === 0) return null;
+  return { providerChains, agentFallbacks };
 }
 
 async function customizeChain(label, providerIds, initial) {

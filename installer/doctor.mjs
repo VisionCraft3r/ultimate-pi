@@ -28,7 +28,11 @@ async function checkProviders(agentDir) {
   const auth = await readAuth(agentDir);
   const providerIds = Object.keys(auth ?? {});
   if (providerIds.length === 0) {
-    return mark(false, "provider auth", "no providers configured — run `ultimate-pi setup providers`");
+    return mark(
+      false,
+      "provider auth",
+      "no providers configured — run `pi login` for your OAuth provider first, then re-run install (or `ultimate-pi setup providers`)",
+    );
   }
   return mark(true, "provider auth", providerIds.join(", "));
 }

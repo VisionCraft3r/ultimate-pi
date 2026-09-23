@@ -23,6 +23,7 @@ export const ENV_VAR_BY_PROVIDER = {
   deepseek: "DEEPSEEK_API_KEY",
 };
 
+/** Canonical catalog IDs for installer templates, --yes defaults, and docs examples. */
 export const DEFAULT_MODELS_BY_PROVIDER = {
   anthropic: ["claude-sonnet-4.6", "claude-opus-4.6", "claude-haiku-4.5"],
   "openai-codex": ["gpt-5.4", "gpt-5.3-codex"],
@@ -42,6 +43,43 @@ export const DEFAULT_PROVIDER_ORDER = [
   "deepseek",
   "other",
 ];
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function firstNonEmptyMap(...candidates) {
+  for (const candidate of candidates) {
+    if (isPlainObject(candidate) && Object.keys(candidate).length > 0) return candidate;
+  }
+  for (const candidate of candidates) {
+    if (isPlainObject(candidate)) return candidate;
+  }
+  return {};
+}
+
+/**
+ * Canonical --answers JSON keys:
+ *   agentAssignments  { [agent]: { provider, model } }
+ *   providerChains    { [provider]: ModelRef[] | providerId[] }  (TOP-LEVEL)
+ *   agentFallbacks    { [agent]: ModelRef[] | { chain } }
+ *
+ * Aliases (normalized, not silently dropped):
+ *   agentModels                 -> agentAssignments
+ *   fallbacks.providerChains    -> providerChains
+ *   fallbacks.agentFallbacks    -> agentFallbacks
+ *
+ * Runtime <agentDir>/model-agents.json uses a different shape (`fallbacks` keyed
+ * by provider). Do not confuse that file with the installer answers file.
+ */
+export function canonicalizeAnswersFields(data = {}) {
+  const nested = isPlainObject(data.fallbacks) ? data.fallbacks : {};
+  return {
+    agentAssignments: firstNonEmptyMap(data.agentAssignments, data.agentModels),
+    providerChains: firstNonEmptyMap(data.providerChains, nested.providerChains),
+    agentFallbacks: firstNonEmptyMap(data.agentFallbacks, nested.agentFallbacks),
+  };
+}
 
 /** Split `provider/id` on the first slash. */
 export function splitModelRef(ref) {
@@ -145,17 +183,18 @@ export function collectEnabledModels(allAnswers = {}) {
     models.push(formatted);
   };
 
-  for (const row of Object.values(allAnswers.agentAssignments ?? {})) {
+  const canonical = canonicalizeAnswersFields(allAnswers);
+  for (const row of Object.values(canonical.agentAssignments)) {
     if (row?.provider && (row.model || row.id)) {
       push({ provider: row.provider, id: row.model ?? row.id });
     }
   }
 
-  const lookup = modelForProviderFromAssignments(allAnswers.agentAssignments);
-  for (const chain of Object.values(normalizeFallbacksMap(allAnswers.providerChains, lookup))) {
+  const lookup = modelForProviderFromAssignments(canonical.agentAssignments);
+  for (const chain of Object.values(normalizeFallbacksMap(canonical.providerChains, lookup))) {
     for (const hop of chain) push(hop);
   }
-  for (const chain of Object.values(normalizeAgentFallbacks(allAnswers.agentFallbacks, lookup))) {
+  for (const chain of Object.values(normalizeAgentFallbacks(canonical.agentFallbacks, lookup))) {
     for (const hop of chain) push(hop);
   }
   return models;

@@ -46,6 +46,47 @@ function anyArgStartsWith(args: string[], prefix: string): boolean {
 	return args.some((a) => a.startsWith(prefix));
 }
 
+function commandBaseName(cmd: string): string {
+	return cmd.split(/[/\\]/).pop() ?? cmd;
+}
+
+function isInterpreterCommand(cmd: string): boolean {
+	const base = commandBaseName(cmd).toLowerCase();
+	return /^(python(\d+(\.\d+)*)?|pypy(\d+)?|perl|ruby|node|nodejs)$/.test(base);
+}
+
+/** Extract the script passed to python/perl/ruby/node `-c`/`-e` (and perl `-pe`/`-ne`). */
+function snippetFromDashCE(rest: string[]): string | null {
+	for (let i = 0; i < rest.length; i++) {
+		const a = rest[i];
+		if (a === "-c" || a === "-e") return rest[i + 1] ?? "";
+		if (a.startsWith("-c") && a.length > 2 && !a.startsWith("--")) return a.slice(2);
+		if (a.startsWith("-e") && a.length > 2 && !a.startsWith("--")) return a.slice(2);
+		// perl -pe/-ne: program is the next argument
+		if (/^-[a-zA-Z]*e[a-zA-Z]*$/.test(a) && a !== "-e") return rest[i + 1] ?? "";
+	}
+	return null;
+}
+
+/** Dangerous substrings inside interpreter one-liners — same family as HEADLESS_BLOCKED. */
+const EMBEDDED_DANGER: Array<{ pattern: RegExp; reason: string }> = [
+	{ pattern: /(?<!\bgit\s+)\brm\b[^#\n]*\s-(?:[a-zA-Z]*[rR]|-\brecursive\b)/, reason: "interpreter -c/-e snippet contains recursive delete (rm -r)" },
+	{ pattern: /\bsudo\b/, reason: "interpreter -c/-e snippet contains sudo (elevated privileges)" },
+	{ pattern: /\bmkfs/, reason: "interpreter -c/-e snippet contains mkfs (filesystem formatting)" },
+	{ pattern: /\bdd\b[^#\n]*\bof=/, reason: "interpreter -c/-e snippet contains dd with output (can overwrite data)" },
+	{ pattern: /\b(curl|wget)\b[^#\n]*\|\s*(ba?sh|zsh|fish|dash|sh)\b/, reason: "interpreter -c/-e snippet contains pipe to shell (remote code execution)" },
+];
+
+function collectInterpreterSnippets(args: string[]): string[] {
+	const snippets: string[] = [];
+	for (let i = 0; i < args.length; i++) {
+		if (!isInterpreterCommand(args[i])) continue;
+		const snippet = snippetFromDashCE(args.slice(i + 1));
+		if (snippet != null && snippet.length > 0) snippets.push(snippet);
+	}
+	return snippets;
+}
+
 function analyzeSegment(seg: Token[]): Risk | null {
 	const reasons: string[] = [];
 	let severity: Severity = "medium";
@@ -61,6 +102,27 @@ function analyzeSegment(seg: Token[]): Risk | null {
 	if (ops.includes("|") && (args.includes("sh") || args.includes("bash") || args.includes("zsh") || args.includes("fish"))) {
 		reasons.push("pipe to a shell (possible remote code execution)");
 		severity = "high";
+	}
+
+	// xargs rm (including `... | xargs rm`)
+	const xargsIdx = args.indexOf("xargs");
+	if (xargsIdx >= 0) {
+		const after = args.slice(xargsIdx + 1);
+		const xargsTarget = after.find((a) => !a.startsWith("-"));
+		if (xargsTarget === "rm" || xargsTarget === "rmdir" || xargsTarget === "unlink") {
+			severity = "high";
+			reasons.push("xargs rm (bulk deletion)");
+		}
+	}
+
+	// python/perl/ruby/node -c/-e one-liners that embed destructive commands
+	for (const snippet of collectInterpreterSnippets(args)) {
+		for (const { pattern, reason } of EMBEDDED_DANGER) {
+			if (pattern.test(snippet)) {
+				severity = "high";
+				reasons.push(reason);
+			}
+		}
 	}
 
 	// sudo
@@ -84,13 +146,10 @@ function analyzeSegment(seg: Token[]): Risk | null {
 		reasons.push("find -delete (bulk deletion)");
 	}
 
-	// git operations (prompt on ANY git command)
+	// git: only actually risky subcommands (not every git invocation)
 	if (cmd === "git") {
 		const sub = rest[0];
 		const subArgs = rest.slice(1);
-
-		// Always prompt for git commands (user requested). Keep severity medium unless an explicit high-risk pattern is detected.
-		reasons.push(sub ? `git ${sub} (git command)` : "git (git command)");
 
 		if (sub === "rm") {
 			severity = "high";
@@ -135,7 +194,7 @@ function analyzeSegment(seg: Token[]): Risk | null {
 	}
 
 	// Disk / volume management (prompt aggressively; high risk)
-	// Linux: mkfs.*, wipefs, parted, fdisk, gdisk/sgdisk, lsblk, cryptsetup, LVM tools, zpool
+	// Linux: mkfs.*, wipefs, parted, fdisk, gdisk/sgdisk, cryptsetup, LVM tools, zpool
 	// macOS: diskutil, hdiutil, gpt, newfs_*, asr
 	if (cmd.startsWith("mkfs")) {
 		severity = "high";
@@ -171,11 +230,6 @@ function analyzeSegment(seg: Token[]): Risk | null {
 	if (cmd === "parted" || cmd === "fdisk" || cmd === "gdisk" || cmd === "sgdisk") {
 		severity = "high";
 		reasons.push(`${cmd} (disk/partition management)`);
-	}
-	if (cmd === "lsblk") {
-		// Usually read-only, but still disk-related; prompt as requested.
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("lsblk (disk listing)");
 	}
 	if (cmd === "cryptsetup") {
 		severity = "high";
@@ -266,7 +320,7 @@ function analyzeSegment(seg: Token[]): Risk | null {
 	return { severity, reasons };
 }
 
-function analyzeBashCommand(command: string): Risk | null {
+export function analyzeBashCommand(command: string): Risk | null {
 	let tokens: Token[];
 	try {
 		tokens = shellParse(command) as Token[];
@@ -386,8 +440,11 @@ const HEADLESS_BLOCKED: Array<{ pattern: RegExp; reason: string }> = [
 	{ pattern: /\bterraform\s+destroy\b/, reason: "infrastructure teardown (terraform destroy)" },
 	{ pattern: /\bkubectl\s+delete\b/, reason: "Kubernetes resource deletion" },
 	{ pattern: /\baws\s+s3\s+rm\b[^#\n]*--recursive/, reason: "bulk S3 deletion (aws s3 rm --recursive)" },
-	// Destructive git operations
+	// Destructive git operations. `git commit` stays in this list so MAIN_DISABLED_BLOCKED
+	// can keep filtering it the same way; subagents get an explicit local-only allowlist
+	// exception for commit/add in evaluateHeadlessBash. push/pull remain blocked.
 	{ pattern: /\bgit\s+commit\b/, reason: "git commit (commits are main-session operations)" },
+	{ pattern: /\bgit\s+add\b/, reason: "git add (staging is a main-session operation)" },
 	{ pattern: /\bgit\s+pull\b/, reason: "git pull (pulls are main-session operations)" },
 	{ pattern: /\bgit\s+push\b/, reason: "git push (pushes are main-session operations)" },
 	{ pattern: /\bgit\s+reset\b[^#\n]*--hard\b/, reason: "discard all uncommitted changes (git reset --hard)" },
@@ -405,6 +462,7 @@ export const MAIN_DISABLED_BLOCKED: Array<{ pattern: RegExp; reason: string }> =
 		const src = pattern.source;
 		return !(
 			src.includes("git\\s+commit") ||
+			src.includes("git\\s+add") ||
 			src.includes("git\\s+pull") ||
 			// Keep `git push --force` blocked but allow plain `git push`.
 			src === "\\bgit\\s+push\\b"
@@ -413,6 +471,29 @@ export const MAIN_DISABLED_BLOCKED: Array<{ pattern: RegExp; reason: string }> =
 );
 
 export type BashGuardDecision = { block: true; reason: string };
+
+/** Local-only git ops subagents may perform (no remote state). Pattern sources from HEADLESS_BLOCKED. */
+const SUBAGENT_ALLOWED_GIT_PATTERNS = new Set(["\\bgit\\s+commit\\b", "\\bgit\\s+add\\b"]);
+
+function isSubagentAllowedGitPattern(pattern: RegExp): boolean {
+	return SUBAGENT_ALLOWED_GIT_PATTERNS.has(pattern.source);
+}
+
+/** Hard-block floor for non-interactive subagent sessions, with a narrow git add/commit allowlist. */
+export function evaluateHeadlessBash(command: string): BashGuardDecision | undefined {
+	for (const { pattern, reason } of HEADLESS_BLOCKED) {
+		if (!pattern.test(command)) continue;
+		if (isSubagentAllowedGitPattern(pattern)) continue;
+		return {
+			block: true,
+			reason:
+				`Blocked by bash-guard: ${reason}. ` +
+				"This is a non-interactive subagent session — catastrophic operations are not permitted. " +
+				"Propose a safer alternative or ask the parent agent to confirm with the user.",
+		};
+	}
+	return undefined;
+}
 
 /** Catastrophic floor applied in the main session even when bash-guard is otherwise disabled. */
 export function evaluateDisabledMainBash(command: string): BashGuardDecision | undefined {
@@ -449,18 +530,7 @@ export default function (pi: ExtensionAPI) {
 		// Subagent mode: hard-block catastrophic operations, no prompting.
 		pi.on("tool_call", async (event) => {
 			if (!isToolCallEventType("bash", event)) return;
-			const command = event.input.command;
-			for (const { pattern, reason } of HEADLESS_BLOCKED) {
-				if (pattern.test(command)) {
-					return {
-						block: true,
-						reason:
-							`Blocked by bash-guard: ${reason}. ` +
-							"This is a non-interactive subagent session — catastrophic operations are not permitted. " +
-							"Propose a safer alternative or ask the parent agent to confirm with the user.",
-					};
-				}
-			}
+			return evaluateHeadlessBash(event.input.command);
 		});
 		return;
 	}

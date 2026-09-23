@@ -1,19 +1,19 @@
 import * as p from "@clack/prompts";
+import {
+  AGENT_NAMES,
+  DEFAULT_MODELS_BY_PROVIDER,
+  canonicalizeAnswersFields,
+} from "./schema.mjs";
 
-const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester"];
+const MODELS_BY_PROVIDER = DEFAULT_MODELS_BY_PROVIDER;
 
-const MODELS_BY_PROVIDER = {
-  anthropic: ["claude-opus-4.6", "claude-sonnet-4.6", "claude-haiku-4.5"],
-  "openai-codex": ["gpt-5.4", "gpt-5.3-codex"],
-  cursor: ["composer-1.5", "grok-4.5", "gpt-5.3-codex"],
-  openrouter: [
-    "anthropic/claude-sonnet-4.6",
-    "openai/gpt-5.4",
-    "deepseek/deepseek-chat",
-  ],
-  deepseek: ["deepseek-chat", "deepseek-reasoner"],
-  openai: ["gpt-5.4", "gpt-4.1"],
-  other: [],
+// Default --yes routing when that provider was selected/authenticated this run.
+// qa_tester has no per-role preference: first selected provider's catalog entry.
+const PREFERRED_PROVIDER_BY_ROLE = {
+  scout: "cursor",
+  worker: "cursor",
+  researcher: "openai-codex",
+  planner: "anthropic",
 };
 
 function isCancelled(value) {
@@ -49,7 +49,8 @@ function parseChoice(value) {
 }
 
 function assignmentsFromAnswers(answers) {
-  const map = answers?.agentModels;
+  // Canonical key is agentAssignments; agentModels is an explicit back-compat alias.
+  const map = canonicalizeAnswersFields(answers).agentAssignments;
   if (!map || typeof map !== "object") return null;
   const out = {};
   for (const name of AGENT_NAMES) {
@@ -60,14 +61,26 @@ function assignmentsFromAnswers(answers) {
   return out;
 }
 
+function firstCatalogAssignment(providerId) {
+  const models = MODELS_BY_PROVIDER[providerId] ?? [];
+  return { provider: providerId, model: models[0] || "default" };
+}
+
 function defaultAssignments(providerIds) {
-  const choices = modelChoices(providerIds);
-  const fallback = choices[0]
-    ? parseChoice(choices[0].value)
-    : { provider: "anthropic", model: "claude-sonnet-4.6" };
-  if (!fallback.model) fallback.model = "default";
+  const selected = new Set(providerIds);
+  const fallbackProvider = providerIds[0];
+  const fallback = fallbackProvider
+    ? firstCatalogAssignment(fallbackProvider)
+    : firstCatalogAssignment("anthropic");
   const out = {};
-  for (const name of AGENT_NAMES) out[name] = { ...fallback };
+  for (const name of AGENT_NAMES) {
+    const preferred = PREFERRED_PROVIDER_BY_ROLE[name];
+    if (preferred && selected.has(preferred)) {
+      out[name] = firstCatalogAssignment(preferred);
+    } else {
+      out[name] = { ...fallback };
+    }
+  }
   return out;
 }
 

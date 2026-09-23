@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createBackupSession } from "../installer/backup.mjs";
-import { removeUltimatePiPackage, runPiRemove } from "../installer/uninstall-package.mjs";
+import {
+  removeUltimatePiPackage,
+  runPiRemove,
+} from "../installer/uninstall-package.mjs";
+import { removeManagedAgentProfiles } from "../installer/uninstall-managed.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLISHED = "git:github.com/VisionCraft3r/ultimate-pi";
@@ -158,6 +162,80 @@ writeFileSync(${JSON.stringify(recordFile)}, JSON.stringify({
   } finally {
     if (originalPath === undefined) delete process.env.PATH;
     else process.env.PATH = originalPath;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("default uninstall still leaves third-party packages, model-agents.json, enabledModels, and auth.json", async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(path.join(dir, "settings.json"), `${JSON.stringify(settingsPayload(), null, 2)}\n`);
+    await writeFile(path.join(dir, "auth.json"), AUTH_BYTES);
+    await writeFile(path.join(dir, "model-agents.json"), `${JSON.stringify({ fallbacks: {} }, null, 2)}\n`);
+
+    const result = await removeUltimatePiPackage(dir, createBackupSession(dir));
+    assert.ok(result.packages.includes("npm:pi-lens"));
+    assert.ok(result.packages.includes(SUBAGENTS));
+    assert.equal(result.modelAgentsRemoved, undefined);
+
+    const settings = JSON.parse(await readFile(path.join(dir, "settings.json"), "utf8"));
+    assert.deepEqual(settings.enabledModels, ["cursor/grok-4.5"]);
+    assert.ok(settings.packages.includes("npm:pi-lens"));
+    assert.equal(await readFile(path.join(dir, "auth.json"), "utf8"), AUTH_BYTES);
+    assert.match(await readFile(path.join(dir, "model-agents.json"), "utf8"), /fallbacks/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("--full / --purge strips third-party packages and model-agents.json but never auth.json", async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(path.join(dir, "settings.json"), `${JSON.stringify(settingsPayload(), null, 2)}\n`);
+    await writeFile(path.join(dir, "auth.json"), AUTH_BYTES);
+    await writeFile(
+      path.join(dir, "model-agents.json"),
+      `${JSON.stringify({ fallbacks: { cursor: [] }, agentFallbacks: {} }, null, 2)}\n`,
+    );
+
+    const backupSession = createBackupSession(dir);
+    const result = await removeUltimatePiPackage(dir, backupSession, { full: true });
+
+    assert.ok(result.removed.includes(ROOT));
+    assert.ok(result.removed.includes(PUBLISHED));
+    assert.ok(result.removed.includes("npm:pi-lens"));
+    assert.ok(result.removed.includes("npm:pi-graft"));
+    assert.ok(result.removed.includes(SUBAGENTS));
+    assert.ok(result.removed.includes("npm:pi-cache-graph"));
+    assert.deepEqual(result.packages, []);
+    assert.equal(result.modelAgentsRemoved, true);
+    assert.match(result.backupsNote ?? "", /backups/);
+
+    const next = JSON.parse(await readFile(path.join(dir, "settings.json"), "utf8"));
+    assert.deepEqual(next.enabledModels, ["cursor/grok-4.5"]);
+    assert.deepEqual(next.packages, []);
+    assert.equal(await readFile(path.join(dir, "auth.json"), "utf8"), AUTH_BYTES);
+    await assert.rejects(() => readFile(path.join(dir, "model-agents.json"), "utf8"), /ENOENT/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("full uninstall via managed profiles reports remaining backups and leaves auth.json", async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(path.join(dir, "auth.json"), AUTH_BYTES);
+    await writeFile(path.join(dir, "model-agents.json"), `${JSON.stringify({ fallbacks: {} }, null, 2)}\n`);
+    const backupSession = createBackupSession(dir);
+    await backupSession.backupIfExists("auth.json");
+
+    const result = await removeManagedAgentProfiles(dir, backupSession, { full: true });
+    assert.equal(result.modelAgentsRemoved, true);
+    assert.ok((result.backupsNote ?? "").includes(dir));
+    assert.match(result.backupsNote ?? "", /backups/);
+    assert.equal(await readFile(path.join(dir, "auth.json"), "utf8"), AUTH_BYTES);
+    await assert.rejects(() => readFile(path.join(dir, "model-agents.json"), "utf8"), /ENOENT/);
+  } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });

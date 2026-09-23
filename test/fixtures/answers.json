@@ -26,52 +26,28 @@
     },
     "researcher": {
       "provider": "openrouter",
-      "model": "openai/gpt-5.4"
+      "model": "openai/gpt-4.1-mini"
     },
     "qa_tester": {
       "provider": "openrouter",
       "model": "deepseek/deepseek-chat"
     }
   },
-  "agentModels": {
-    "scout": {
-      "provider": "openrouter",
-      "model": "anthropic/claude-sonnet-4.6"
-    },
-    "worker": {
-      "provider": "anthropic",
-      "model": "claude-opus-4.6"
-    },
-    "planner": {
-      "provider": "anthropic",
-      "model": "claude-opus-4.6"
-    },
-    "researcher": {
-      "provider": "openrouter",
-      "model": "openai/gpt-5.4"
-    },
-    "qa_tester": {
-      "provider": "openrouter",
-      "model": "deepseek/deepseek-chat"
-    }
+  "providerChains": {
+    "anthropic": [
+      {
+        "provider": "openrouter",
+        "id": "anthropic/claude-sonnet-4.6"
+      }
+    ],
+    "openrouter": [
+      {
+        "provider": "anthropic",
+        "id": "claude-opus-4.6"
+      }
+    ]
   },
-  "fallbacks": {
-    "providerChains": {
-      "anthropic": [
-        {
-          "provider": "openrouter",
-          "id": "anthropic/claude-sonnet-4.6"
-        }
-      ],
-      "openrouter": [
-        {
-          "provider": "anthropic",
-          "id": "claude-opus-4.6"
-        }
-      ]
-    },
-    "agentFallbacks": {}
-  },
+  "agentFallbacks": {},
   "packages": [],
   "extras": {
     "enabledExtras": []

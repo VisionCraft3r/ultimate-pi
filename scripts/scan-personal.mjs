@@ -22,10 +22,11 @@ const NAME_DENYLIST = ["fatima", "midas al-furat"];
 /** Case-insensitive substring denylist for real company/product names that shouldn't be in a generic template. */
 const COMPANY_DENYLIST = [];
 
-/** Path fragments that indicate a hardcoded personal home directory rather than a generic placeholder. */
+/** Path fragments that indicate a hardcoded personal home directory rather than a generic placeholder.
+ *  Additive to NAME_DENYLIST: flags ANY committer's macOS `/Users/<name>/` or Linux `/home/<name>/` path. */
 const PATH_PATTERNS = [
-  /\/Users\/(?!YOUR_USERNAME|<[^>]+>|placeholder)[A-Za-z0-9._-]+/g,
-  /\/home\/(?!YOUR_USERNAME|<[^>]+>|placeholder)[A-Za-z0-9._-]+/g,
+  /\/Users\/(?!YOUR_USERNAME|Shared|Guest|<[^>]+>|placeholder)[A-Za-z0-9._-]+/g,
+  /\/home\/(?!YOUR_USERNAME|Shared|Guest|<[^>]+>|placeholder)[A-Za-z0-9._-]+/g,
 ];
 
 function git(args) {

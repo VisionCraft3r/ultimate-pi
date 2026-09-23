@@ -50,6 +50,60 @@ function providersFromAnswers(answers) {
   });
 }
 
+function providerId(provider) {
+  return typeof provider === "string" ? provider : provider?.id;
+}
+
+function providerCredential(provider) {
+  return typeof provider === "string" ? undefined : provider?.credential;
+}
+
+function providerAuthMethod(provider) {
+  const id = providerId(provider);
+  if (typeof provider === "string" || provider?.authMethod == null) return authMethodFor(id);
+  return normalizeAuthMethod(provider.authMethod, id);
+}
+
+function authHasProvider(auth, id) {
+  if (!auth || typeof auth !== "object" || !id) return false;
+  const entry = auth[id];
+  if (entry == null) return false;
+  if (typeof entry === "object") return Object.keys(entry).length > 0;
+  return true;
+}
+
+/**
+ * Providers that have neither a captured credential nor an auth.json entry.
+ * Does not change the collectProviders return shape.
+ */
+export function providersMissingAuth(providers, auth = {}) {
+  return (providers ?? []).filter((provider) => {
+    const id = providerId(provider);
+    if (!id) return false;
+    const credential = providerCredential(provider);
+    if (typeof credential === "string" && credential.trim()) return false;
+    if (authHasProvider(auth, id)) return false;
+    return true;
+  });
+}
+
+/** Message for `--yes` when selected providers are not authenticated. Null if ready. */
+export function yesModeAuthError(providers, auth = {}) {
+  const missing = providersMissingAuth(providers, auth);
+  if (missing.length === 0) return null;
+  const ids = missing.map((provider) => providerId(provider)).filter(Boolean);
+  const listed = ids.join(", ");
+  const oauthIds = missing
+    .filter((provider) => providerAuthMethod(provider) === "oauth")
+    .map((provider) => providerId(provider))
+    .filter(Boolean);
+  const prefix =
+    oauthIds.length === missing.length
+      ? `Run \`pi login\` for ${listed} first, then re-run install.`
+      : `Auth is not ready for ${listed}. For OAuth providers run \`pi login\` first; for API-key providers add a key, then re-run install.`;
+  return `${prefix} No settings or packages were applied.`;
+}
+
 async function promptApiKey(id) {
   const credential = isCancelled(
     await p.password({
