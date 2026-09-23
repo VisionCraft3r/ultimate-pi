@@ -87,6 +87,12 @@ function resolvePackageRoot(agentDir, spec) {
     if (!repo) return "";
     return gitInstallPath(agentDir, repo);
   }
+  // Local package specs: `.`, `..`, and relative paths. `pi install <path>`
+  // stores the spec relative to agentDir (e.g. "../../Documents/foo"), not
+  // as an absolute path, so resolve it the same way pi does.
+  if (spec === "." || spec === ".." || spec.startsWith("./") || spec.startsWith("../")) {
+    return path.resolve(agentDir, spec);
+  }
   return "";
 }
 

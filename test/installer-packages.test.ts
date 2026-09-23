@@ -88,6 +88,46 @@ test("doctor --offline checks settings source specs and ✖ when lens or graft i
   }
 });
 
+test("doctor accepts a relative local package spec, matching how `pi install <path>` stores it", async () => {
+  const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-relative-"));
+  try {
+    // `pi install <path>` records the spec relative to agentDir, not as an
+    // absolute path — e.g. "../../Documents/UltimatePI/ultimate-pi". Doctor
+    // must resolve that the same way pi does, not just handle absolute paths.
+    const outsideRoot = await mkdtemp(path.join(tmpdir(), "ultimate-pi-relative-target-"));
+    try {
+      await writeFile(
+        path.join(outsideRoot, "package.json"),
+        `${JSON.stringify(
+          {
+            name: "ultimate-pi",
+            pi: { extensions: ["./extensions/model-agents.ts"], skills: ["./skills"] },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      const relativeSpec = path.relative(agentDir, outsideRoot);
+      await writeFile(
+        path.join(agentDir, "settings.json"),
+        `${JSON.stringify(
+          { packages: [relativeSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft"] },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const report = await doctor({ agentDir, offline: true });
+      const check = report.checks.find((row) => row.label === "required packages");
+      assert.equal(check?.ok, true, check?.detail);
+    } finally {
+      await rm(outsideRoot, { recursive: true, force: true });
+    }
+  } finally {
+    await rm(agentDir, { recursive: true, force: true });
+  }
+});
+
 test("doctor accepts a forked git origin when package.json name and pi manifest match", async () => {
   const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-fork-"));
   try {
