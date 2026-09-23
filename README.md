@@ -56,6 +56,36 @@ Graft is used first for contextual lookup across the repo; pi-lens handles
 semantic navigation and diagnostics. If either is unavailable, Ultimate Pi
 falls back to the remaining tools rather than blocking the session.
 
+## Benchmarks
+
+> **Illustrative estimates, not a published/reproducible benchmark suite.**
+> These charts model a representative heavy day and a representative
+> unknown-location bug hunt to show *why* tiered routing plus multi-provider
+> seat-stacking helps, not exact numbers you should expect to reproduce.
+> Your own costs/times/quality will vary with your providers, plans, and
+> the work itself.
+
+**Cost of the same heavy day** (4 recon + 3 implement + 2 research + 1 plan),
+fully loaded USD, vs. metered API pricing and single-provider plans:
+
+![Cost of the same heavy day](./docs/images/benchmarks/cost-per-heavy-day.png)
+
+**Efficiency of the same heavy day** — subscription utilization, correct-role
+spend, work per dollar, and completing the day without a quota stall:
+
+![Efficiency of the same heavy day](./docs/images/benchmarks/efficiency-index.png)
+
+**Time to map the same unknown-location bug** — wall-clock time to a single
+agent working alone vs. three parallel scouts:
+
+![Time to map the same unknown-location bug](./docs/images/benchmarks/bug-mapping-time.png)
+
+**Where that quality comes from** — correct-file edits, tests green on first
+verify, diff hygiene, spec-aligned architecture, and shipping without a
+rollback:
+
+![Where that quality comes from](./docs/images/benchmarks/quality-index.png)
+
 ## Requirements
 
 - macOS or Linux. Windows is supported via WSL only (the subagent orchestration
