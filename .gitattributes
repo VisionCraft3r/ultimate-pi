@@ -1,0 +1,2 @@
+# Patch fixtures preserve upstream whitespace byte-for-byte for git apply.
+patches/*.patch -whitespace

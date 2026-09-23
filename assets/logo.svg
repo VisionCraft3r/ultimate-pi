@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200" width="640" height="200" role="img" aria-label="THE ULTIMATE PI">
+  <rect width="640" height="200" fill="#111111"/>
+  <text x="48" y="96" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="36" font-weight="700" letter-spacing="2">
+    <tspan fill="#ffaf00">&gt;_  </tspan>
+    <tspan fill="#ffffff">THE ULTIMATE</tspan>
+    <tspan fill="#ffd700">  PI</tspan>
+  </text>
+  <text x="48" y="136" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="16" fill="#8a8a8a">Multi-agent routing for the Pi CLI.</text>
+</svg>

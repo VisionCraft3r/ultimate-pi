@@ -1,0 +1,23 @@
+diff --git a/dist/proxy/main.js b/dist/proxy/main.js
+--- a/dist/proxy/main.js
++++ b/dist/proxy/main.js
+@@ -9233,8 +9233,8 @@
+ const CURSOR_API_URL = "https://api2.cursor.sh";
+ const CURSOR_CLIENT_VERSION = "cli-2026.01.09-231024f";
+ const HEARTBEAT_INTERVAL_MS = 3e4;
+-const INACTIVITY_THINKING_MS = 3e4;
+-const INACTIVITY_STREAMING_MS = 15e3;
++const INACTIVITY_THINKING_MS = 12e4;
++const INACTIVITY_STREAMING_MS = 6e4;
+ const INACTIVITY_FLUSHED_MS = 6e5;
+ const CLOSE_OK = 0;
+ const CLOSE_ERR = 1;
+@@ -9563,7 +9563,7 @@
+ 				sendFrame,
+ 				state: this.streamState,
+ 				onText: (text, isThinking) => {
+-					if (this.timerPhase === "thinking") this.timerPhase = "streaming";
++					if (!isThinking && this.timerPhase === "thinking") this.timerPhase = "streaming";
+ 					this.queue.push({
+ 						type: "text",
+ 						text,

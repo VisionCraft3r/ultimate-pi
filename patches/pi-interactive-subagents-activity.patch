@@ -1,0 +1,104 @@
+diff --git a/pi-extension/subagents/activity.ts b/pi-extension/subagents/activity.ts
+index 5fd2f7a..e406d71 100644
+--- a/pi-extension/subagents/activity.ts
++++ b/pi-extension/subagents/activity.ts
+@@ -129,12 +129,24 @@ function validateBoolean(object: Record<string, unknown>, fieldName: string): st
+   return typeof object[fieldName] === "boolean" ? null : `${fieldName} must be a boolean`;
+ }
+ 
+-function validateOptionalActivityString(object: Record<string, unknown>, fieldName: string): string | null {
++function sanitizeActivityString(value: string): string {
++  const collapsed = value.replace(/[\r\n]+/g, " ");
++  return collapsed.length <= MAX_ACTIVITY_STRING_LENGTH
++    ? collapsed
++    : collapsed.slice(0, MAX_ACTIVITY_STRING_LENGTH);
++}
++
++function sanitizeOptionalActivityString(value: string | undefined): string | undefined {
++  if (value == null) return value;
++  return sanitizeActivityString(value);
++}
++
++function normalizeOptionalActivityString(object: Record<string, unknown>, fieldName: string): string | null {
+   const value = object[fieldName];
+   if (value == null) return null;
+   if (typeof value !== "string") return `${fieldName} must be a string when present`;
+-  if (/\r|\n/.test(value)) return `${fieldName} must not contain newlines`;
+-  return value.length <= MAX_ACTIVITY_STRING_LENGTH ? null : `${fieldName} is too long`;
++  object[fieldName] = sanitizeActivityString(value);
++  return null;
+ }
+ 
+ function invalidActivity(error: string): ActivityReadResult {
+@@ -173,9 +185,9 @@ function validateActivity(value: unknown, expectedRunningChildId: string): Activ
+     validateOptionalInteger(object, "turnIndex"),
+     validateOptionalFiniteNumber(object, "toolStartedAt"),
+     validateOptionalFiniteNumber(object, "toolEndedAt"),
+-    validateOptionalActivityString(object, "messageEventType"),
+-    validateOptionalActivityString(object, "toolCallId"),
+-    validateOptionalActivityString(object, "toolName"),
++    normalizeOptionalActivityString(object, "messageEventType"),
++    normalizeOptionalActivityString(object, "toolCallId"),
++    normalizeOptionalActivityString(object, "toolName"),
+   ].find((error) => error != null);
+   if (validationError) return invalidActivity(validationError);
+ 
+@@ -448,15 +460,15 @@ export function createSubagentActivityRecorder(params: {
+       record("message_update", (current, observedAt) => {
+         current.agentActive = true;
+         current.turnActive = true;
+-        current.messageEventType = messageEventType;
++        current.messageEventType = sanitizeOptionalActivityString(messageEventType);
+         if (!current.toolActive) markActive(current, "streaming", observedAt);
+       }, "throttled");
+     },
+     toolExecutionStart(toolCallId, toolName) {
+       record("tool_execution_start", (current, observedAt) => {
+         current.toolActive = true;
+-        current.toolCallId = toolCallId;
+-        current.toolName = toolName;
++        current.toolCallId = sanitizeOptionalActivityString(toolCallId);
++        current.toolName = sanitizeOptionalActivityString(toolName);
+         current.toolStartedAt = observedAt;
+         markActive(current, "tool", observedAt, true);
+       }, "immediate");
+@@ -464,31 +476,31 @@ export function createSubagentActivityRecorder(params: {
+     toolCall(toolCallId, toolName) {
+       record("tool_call", (current, observedAt) => {
+         current.toolActive = true;
+-        current.toolCallId = toolCallId ?? current.toolCallId;
+-        current.toolName = toolName ?? current.toolName;
++        current.toolCallId = toolCallId == null ? current.toolCallId : sanitizeActivityString(toolCallId);
++        current.toolName = toolName == null ? current.toolName : sanitizeActivityString(toolName);
+         markActive(current, "tool", observedAt);
+       }, "immediate");
+     },
+     toolExecutionUpdate(toolCallId, toolName) {
+       record("tool_execution_update", (current, observedAt) => {
+         current.toolActive = true;
+-        current.toolCallId = toolCallId ?? current.toolCallId;
+-        current.toolName = toolName ?? current.toolName;
++        current.toolCallId = toolCallId == null ? current.toolCallId : sanitizeActivityString(toolCallId);
++        current.toolName = toolName == null ? current.toolName : sanitizeActivityString(toolName);
+         markActive(current, "tool", observedAt);
+       }, "throttled");
+     },
+     toolResult(toolCallId, toolName) {
+       record("tool_result", (current) => {
+-        current.toolCallId = toolCallId ?? current.toolCallId;
+-        current.toolName = toolName ?? current.toolName;
++        current.toolCallId = toolCallId == null ? current.toolCallId : sanitizeActivityString(toolCallId);
++        current.toolName = toolName == null ? current.toolName : sanitizeActivityString(toolName);
+         refreshActiveScope(current);
+       }, "immediate");
+     },
+     toolExecutionEnd(toolCallId, toolName) {
+       record("tool_execution_end", (current, observedAt) => {
+         current.toolActive = false;
+-        current.toolCallId = toolCallId ?? current.toolCallId;
+-        current.toolName = toolName ?? current.toolName;
++        current.toolCallId = toolCallId == null ? current.toolCallId : sanitizeActivityString(toolCallId);
++        current.toolName = toolName == null ? current.toolName : sanitizeActivityString(toolName);
+         current.toolEndedAt = observedAt;
+         refreshActiveScope(current);
+       }, "immediate");

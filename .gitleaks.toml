@@ -1,0 +1,36 @@
+# gitleaks config for Ultimate Pi.
+#
+# This file is documentation / best-effort defense in depth. The actually
+# enforced scanners in CI and pre-push are scripts/scan-secrets.mjs and
+# scripts/scan-personal.mjs (see .github/workflows/ci.yml and `npm run scan`).
+# Running `gitleaks detect --source . --log-opts="--all"` locally is optional.
+
+[extend]
+useDefault = true
+
+# Custom rule documenting the personal-identifying string denylist enforced
+# by scripts/scan-personal.mjs (spec §6). gitleaks itself is a secret
+# scanner, not a personal-data scanner, so this rule is best-effort and not
+# a substitute for scan-personal.mjs.
+[[rules]]
+id = "ultimate-pi-personal-strings"
+description = "Personal/dev-machine strings that must never appear in this repo"
+regex = '''(?i)(MacAI|/Users/[a-zA-Z]|/home/[a-z]|fatima|midas|al-furat|UltimatePI|GodsEye|PC5D|Cursor Pro)'''
+tags = ["personal-data", "ultimate-pi"]
+
+# Path-dependent macOS-extra exceptions cannot be expressed with Go's RE2
+# lookahead syntax. The mandatory scripts/scan-personal.mjs owns that check.
+
+[allowlist]
+description = "Known-safe placeholders and doc examples"
+regexes = [
+  '''<your-[a-z-]+>''',
+  '''sk-or-\.\.\.''',
+  '''test-key-not-real''',
+]
+paths = [
+  '''node_modules''',
+  '''package-lock\.json''',
+  '''^\.gitleaks\.toml$''',
+  '''^scripts/scan-personal\.mjs$''',
+]

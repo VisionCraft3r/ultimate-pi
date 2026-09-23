@@ -1,0 +1,74 @@
+{
+  "name": "ultimate-pi",
+  "version": "0.1.0",
+  "description": "Multi-agent routing for the Pi CLI.",
+  "type": "module",
+  "license": "MIT",
+  "repository": "github:VisionCraft3r/ultimate-pi",
+  "keywords": ["pi-package", "pi", "ai-agents", "multi-agent"],
+  "bin": {
+    "ultimate-pi": "bin/ultimate-pi.mjs"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/jev-triage.ts",
+      "./extensions/jev-sentinel.ts",
+      "./extensions/quota-fallback.ts",
+      "./extensions/model-agents.ts",
+      "./extensions/planner-handoff.ts",
+      "./extensions/custom-header.ts",
+      "./extensions/ask-user-question.ts",
+      "./extensions/bash-guard/index.ts",
+      "./extensions/browser/index.ts",
+      "./extensions/prompt-snippets/index.ts",
+      "./extensions/web-fetch/index.ts",
+      "./extensions/web-search/index.ts"
+    ],
+    "skills": ["./skills"],
+    "prompts": []
+  },
+  "files": [
+    "bin",
+    "installer",
+    "extensions",
+    "extras",
+    "lib",
+    "skills",
+    "templates",
+    "patches",
+    "assets",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md"
+  ],
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "@mozilla/readability": "^0.5.0",
+    "linkedom": "^0.16.0",
+    "playwright-core": "^1.49.0",
+    "shell-quote": "^1.8.3",
+    "turndown": "^7.2.0",
+    "unpdf": "^1.4.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "scan": "node scripts/scan-secrets.mjs && node scripts/scan-personal.mjs",
+    "smoke": "node scripts/smoke-install.mjs"
+  }
+}

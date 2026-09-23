@@ -1,0 +1,79 @@
+{
+  "providers": [
+    {
+      "id": "anthropic",
+      "authMethod": "api-key",
+      "credential": "test-key-not-real"
+    },
+    {
+      "id": "openrouter",
+      "authMethod": "api-key",
+      "credential": "test-key-not-real"
+    }
+  ],
+  "agentAssignments": {
+    "scout": {
+      "provider": "openrouter",
+      "model": "anthropic/claude-sonnet-4.6"
+    },
+    "worker": {
+      "provider": "anthropic",
+      "model": "claude-opus-4.6"
+    },
+    "planner": {
+      "provider": "anthropic",
+      "model": "claude-opus-4.6"
+    },
+    "researcher": {
+      "provider": "openrouter",
+      "model": "openai/gpt-5.4"
+    },
+    "qa_tester": {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-chat"
+    }
+  },
+  "agentModels": {
+    "scout": {
+      "provider": "openrouter",
+      "model": "anthropic/claude-sonnet-4.6"
+    },
+    "worker": {
+      "provider": "anthropic",
+      "model": "claude-opus-4.6"
+    },
+    "planner": {
+      "provider": "anthropic",
+      "model": "claude-opus-4.6"
+    },
+    "researcher": {
+      "provider": "openrouter",
+      "model": "openai/gpt-5.4"
+    },
+    "qa_tester": {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-chat"
+    }
+  },
+  "fallbacks": {
+    "providerChains": {
+      "anthropic": [
+        {
+          "provider": "openrouter",
+          "id": "anthropic/claude-sonnet-4.6"
+        }
+      ],
+      "openrouter": [
+        {
+          "provider": "anthropic",
+          "id": "claude-opus-4.6"
+        }
+      ]
+    },
+    "agentFallbacks": {}
+  },
+  "packages": [],
+  "extras": {
+    "enabledExtras": []
+  }
+}

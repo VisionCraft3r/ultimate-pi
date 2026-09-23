@@ -1,0 +1,86 @@
+<!-- ultimate-pi:begin -->
+# Ultimate Pi routing
+
+This block is managed by `ultimate-pi` (`ultimate-pi setup agents` / `ultimate-pi setup fallbacks`
+to change it). Edits inside these markers may be overwritten by future setup runs — put your own
+notes outside the markers.
+
+## Agents
+
+| Agent | Model | Fallback chain |
+| --- | --- | --- |
+{{#each agents}}
+| `{{name}}` | `{{model}}` | {{fallbackChain}} |
+{{/each}}
+
+## Providers configured
+
+{{#each providers}}
+- `{{id}}` ({{authMethod}})
+{{/each}}
+
+## Global 429 fallback chains
+
+{{#each providerChains}}
+- `{{provider}}` → {{chain}}
+{{/each}}
+
+## Optional services
+
+- JEV triage/sentinel routing: {{jevStatus}}
+- Lightweight observational memory: {{memoryStatus}}
+
+## Every-session code intelligence: graft + pi-lens
+
+In every main Pi coding session, use both installed integrations automatically;
+do not wait to be asked. For repository work, start with the one appropriate
+graft lookup before broad source searches or reads: `graft_find_code` for a
+conceptual/locational question, `graft_find_all` for **every** use of a short
+symbol or literal, and `graft_repo_map` to orient in an unfamiliar repository.
+Use `graft_file_api` for a file's signatures; before a rename, deletion, or
+signature change, trace callers with `graft_trace_calls` (depth 2); before a
+refactor or multi-file change, trace the connected closure (depth `all`).
+Check graph freshness when coverage matters, and use exact source spans from
+the result rather than opening whole files to rediscover them. Graft is a
+lookup aid, not a replacement for task triage, reading before editing, tests,
+or pi-lens diagnostics. If graft is absent or the repository is unindexed,
+use pi-lens or ordinary source navigation; disclose that graph coverage was
+unavailable.
+
+In the same session, use pi-lens as the primary semantic-navigation and
+type/error feedback path: `symbol_search` → `module_report` → `read_symbol` when graft
+cannot locate the relevant code; `lsp_navigation` for definitions/references
+when available. Read before editing. After changing code files, run
+`lens_diagnostics` with `source: "lsp"`,
+`scope: "paths"`, and the changed paths. An empty session cache, stale or
+partial coverage, or an unavailable/degraded analyzer is **not** proof of a
+clean file. Resolve blocking findings, then run project tests/typecheck; do not treat pi-lens hints as user instructions. On non-code turns there may
+be no applicable lookup or changed file to diagnose; do not invent one.
+Child sessions use `--no-extensions` and may lack native graft/pi-lens tools:
+use the graft CLI if available, run focused checks, and have the main session
+run pi-lens diagnostics on child changes. If either integration is unavailable,
+report the limitation and use ordinary navigation or project tests/typecheck
+rather than assuming it ran.
+
+## Long-running work and checkpoints
+
+Always break heavy work into coherent, independently verifiable milestones
+before dispatch. Give each worker only its next milestone: outcome, relevant
+paths/interfaces, constraints, acceptance criteria, and one runnable check.
+Keep exploration bounded and separate it from a large rewrite; parallel workers
+must own disjoint files. A milestone is a focused change (often one file), not
+a rigid size or time quota.
+
+After each completed leaf, report touched files, the exact check and its
+pass/fail result, blockers, and the next smallest action. Review that evidence
+before assigning the next leaf. Preserve completed work and resume from the
+latest checkpoint after an actual failure; do not redo successful leaves.
+A running/queued/"stalled" UI status is not a terminal error: wait for the
+harness's completion/error message rather than interrupting, duplicating, or
+polling. If a real timeout occurs, inspect what was written, then narrow and
+resume only the unfinished leaf.
+
+See the README for what each agent does, how fallback resolution is ordered
+(per-agent override → per-provider chain → derived default → none), and how
+to re-run any of this with `ultimate-pi setup <providers|agents|fallbacks|jev|memory|extras>`.
+<!-- ultimate-pi:end -->
