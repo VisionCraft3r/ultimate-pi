@@ -1,12 +1,10 @@
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { checkNode, checkPi, checkTmux, resolveAgentDir } from "./preflight.mjs";
 import { readAuth } from "./auth-store.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SELF_GIT_REPO = "github.com/VisionCraft3r/ultimate-pi";
+const SELF_PACKAGE_NAME = "ultimate-pi";
 const SUBAGENTS_GIT_REPO = "github.com/amosblomqvist/pi-interactive-subagents";
 
 function mark(ok, label, detail = "") {
@@ -65,21 +63,52 @@ function gitRepo(spec) {
   return value.replace(/\/+$/, "");
 }
 
-function isSelfSource(spec) {
-  if (gitRepo(spec) === SELF_GIT_REPO) return true;
-  if (path.isAbsolute(spec) && path.resolve(spec) === ROOT) return true;
-  return false;
+function isGitLikeSpec(spec) {
+  return (
+    spec.startsWith("git:") ||
+    spec.startsWith("https://") ||
+    spec.startsWith("http://") ||
+    spec.startsWith("ssh://") ||
+    spec.startsWith("git@")
+  );
 }
 
 function gitInstallPath(agentDir, repo) {
   return path.join(agentDir, "git", ...repo.split("/").filter(Boolean));
 }
 
+function resolvePackageRoot(agentDir, spec) {
+  if (typeof spec !== "string" || spec.length === 0) return "";
+  if (path.isAbsolute(spec)) return path.resolve(spec);
+  const npmName = npmPackageName(spec);
+  if (npmName) return path.join(agentDir, "npm", "node_modules", npmName);
+  if (isGitLikeSpec(spec)) {
+    const repo = gitRepo(spec);
+    if (!repo) return "";
+    return gitInstallPath(agentDir, repo);
+  }
+  return "";
+}
+
+function isSelfPackage(pkg) {
+  if (!pkg || typeof pkg !== "object") return false;
+  if (pkg.name !== SELF_PACKAGE_NAME) return false;
+  const manifest = pkg.pi;
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return false;
+  return Array.isArray(manifest.extensions) && Array.isArray(manifest.skills);
+}
+
+async function isSelfSource(agentDir, spec) {
+  const root = resolvePackageRoot(agentDir, spec);
+  if (!root) return false;
+  return isSelfPackage(await readJsonSafe(path.join(root, "package.json")));
+}
+
 function physicallyInstalled(agentDir, kind, matchedSources) {
   if (kind === "self") {
     return matchedSources.some((spec) => {
-      if (path.isAbsolute(spec)) return existsSync(path.resolve(spec));
-      return existsSync(gitInstallPath(agentDir, SELF_GIT_REPO));
+      const root = resolvePackageRoot(agentDir, spec);
+      return Boolean(root) && existsSync(root);
     });
   }
   if (kind === "git:github.com/amosblomqvist/pi-interactive-subagents") {
@@ -96,7 +125,7 @@ async function checkRequiredPackages(agentDir, options = {}) {
   const sources = packages.map(packageSource).filter(Boolean);
 
   const required = [
-    { id: "self", match: isSelfSource },
+    { id: "self", match: (spec) => isSelfSource(agentDir, spec) },
     { id: "git:github.com/amosblomqvist/pi-interactive-subagents", match: (spec) => gitRepo(spec) === SUBAGENTS_GIT_REPO },
     { id: "npm:pi-lens", match: (spec) => npmPackageName(spec) === "pi-lens" },
     { id: "npm:pi-graft", match: (spec) => npmPackageName(spec) === "pi-graft" },
@@ -105,7 +134,10 @@ async function checkRequiredPackages(agentDir, options = {}) {
   const missingSettings = [];
   const missingInstall = [];
   for (const req of required) {
-    const matched = sources.filter((spec) => req.match(spec));
+    const matched = [];
+    for (const spec of sources) {
+      if (await req.match(spec)) matched.push(spec);
+    }
     if (matched.length === 0) {
       missingSettings.push(req.id);
       continue;

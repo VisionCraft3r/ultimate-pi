@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,6 +83,90 @@ test("doctor --offline checks settings source specs and ✖ when lens or graft i
     assert.match(missingCheck?.detail ?? "", /npm:pi-lens missing from settings\.json/);
     assert.match(missingCheck?.detail ?? "", /npm:pi-graft missing from settings\.json/);
     assert.doesNotMatch(missingCheck?.detail ?? "", /listed but not installed/);
+  } finally {
+    await rm(agentDir, { recursive: true, force: true });
+  }
+});
+
+test("doctor accepts a forked git origin when package.json name and pi manifest match", async () => {
+  const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-fork-"));
+  try {
+    const forkSpec = "git:github.com/anyone/renamed-pi";
+    const forkRoot = path.join(agentDir, "git", "github.com", "anyone", "renamed-pi");
+    await mkdir(forkRoot, { recursive: true });
+    await writeFile(
+      path.join(forkRoot, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "ultimate-pi",
+          pi: {
+            extensions: ["./extensions/model-agents.ts"],
+            skills: ["./skills"],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeFile(
+      path.join(agentDir, "settings.json"),
+      `${JSON.stringify(
+        { packages: [forkSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft"] },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const report = await doctor({ agentDir, offline: true });
+    const check = report.checks.find((row) => row.label === "required packages");
+    assert.equal(check?.ok, true, check?.detail);
+  } finally {
+    await rm(agentDir, { recursive: true, force: true });
+  }
+});
+
+test("doctor rejects a listed package whose name or pi manifest is not ultimate-pi", async () => {
+  const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-identity-"));
+  try {
+    const plausibleSpec = "git:github.com/anyone/ultimate-pi";
+    const installRoot = path.join(agentDir, "git", "github.com", "anyone", "ultimate-pi");
+    await mkdir(installRoot, { recursive: true });
+
+    await writeFile(
+      path.join(installRoot, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "other-tool",
+          pi: {
+            extensions: ["./extensions/model-agents.ts"],
+            skills: ["./skills"],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeFile(
+      path.join(agentDir, "settings.json"),
+      `${JSON.stringify(
+        { packages: [plausibleSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft"] },
+        null,
+        2,
+      )}\n`,
+    );
+    const wrongName = await doctor({ agentDir, offline: true });
+    const wrongNameCheck = wrongName.checks.find((row) => row.label === "required packages");
+    assert.equal(wrongNameCheck?.ok, false);
+    assert.match(wrongNameCheck?.detail ?? "", /self missing from settings\.json/);
+
+    await writeFile(
+      path.join(installRoot, "package.json"),
+      `${JSON.stringify({ name: "ultimate-pi", pi: { extensions: "./extensions" } }, null, 2)}\n`,
+    );
+    const wrongShape = await doctor({ agentDir, offline: true });
+    const wrongShapeCheck = wrongShape.checks.find((row) => row.label === "required packages");
+    assert.equal(wrongShapeCheck?.ok, false);
+    assert.match(wrongShapeCheck?.detail ?? "", /self missing from settings\.json/);
   } finally {
     await rm(agentDir, { recursive: true, force: true });
   }
