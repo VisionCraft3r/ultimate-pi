@@ -263,6 +263,9 @@ MIT) and a number of community packages: `pi-interactive-subagents`,
 `pi-cache-graph`, and `pi-graft`, plus JEV (TypeSafe AI, via OpenRouter). Full
 detail, licenses, and copyright notices are in [NOTICE.md](./NOTICE.md).
 
+Thanks to [Eero Alvar](https://www.youtube.com/@EeroAlvar) for the Pi content
+and inspiration that helped shape this project.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for dev setup, running

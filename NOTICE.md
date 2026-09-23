@@ -8,6 +8,14 @@ The wording below is a factual credit list compiled from public sources. It is n
 
 ---
 
+## Inspiration
+
+Thanks to [Eero Alvar](https://www.youtube.com/@EeroAlvar) on YouTube for Pi
+content and inspiration that helped shape this project. This is a thanks/
+inspiration credit, not a claim of code authorship, license, or affiliation.
+
+---
+
 ## Host: Pi
 
 [Pi](https://github.com/badlogic/pi-mono) by Mario Zechner / [earendil-works](https://github.com/earendil-works/pi), MIT.
