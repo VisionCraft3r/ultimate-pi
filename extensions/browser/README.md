@@ -24,30 +24,30 @@ The same requirement is listed in the top-level [README](../../README.md#require
 Then `/reload` inside pi (or restart). The tools (`browser_goto`,
 `browser_eval`, …) appear in `pi.getAllTools()` when this extension is loaded.
 
-## Default off, opt in per session
+## Default on, opt out per session
 
 The browser tools collectively cost ~800 tokens in the system prompt
-(snippets + guidelines) but are only useful in the small minority of
-sessions that involve driving a live SPA. They're therefore registered but
-**inactive** by default: invisible to the agent, not callable, no prompt
-snippets or guidelines emitted.
+(snippets + guidelines). They're registered and **active** by default on a
+fresh session: visible to the agent, callable immediately, no extra step
+required.
 
-Flip them on when you actually need them:
+Turn them off if you want to save that ~800-token budget for a session that
+won't touch a live SPA:
 
 ```
-/browser on        # enable
-/browser           # status
 /browser off       # disable and close the headless browser
+/browser           # status
+/browser on        # re-enable
 ```
 
 The enable bit persists for the current session via a custom session entry,
-so `/reload` and pi restart keep it on. `/new` resets to off. Disabling also
-tears down the Chromium context (`browser_close` semantics) so no
-background browser is left running.
+so `/reload` and pi restart keep whatever state you last set. `/new` resets
+to the default (on). Disabling also tears down the Chromium context
+(`browser_close` semantics) so no background browser is left running.
 
 ## Tools
 
-(Only visible to the agent while `/browser on`.)
+(Visible to the agent by default; hidden while `/browser off`.)
 
 | Tool | Purpose |
 |---|---|

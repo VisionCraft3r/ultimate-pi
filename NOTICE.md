@@ -105,7 +105,7 @@ Local Pi extension (tool-call interceptor for `bash`). Runtime library: [`shell-
 
 ### `extensions/browser/`
 
-Local Pi extension (`browser_*` tools, default off). Runtime library: [`playwright-core`](https://www.npmjs.com/package/playwright-core) (Apache-2.0). Persistent profile directory is `<agentDir>/extensions/browser/.profile` (`PI_CODING_AGENT_DIR` or `~/.pi/agent`), overridable with `PI_BROWSER_PROFILE`. Chromium is not bundled; install separately with `npx playwright-core install chromium`.
+Local Pi extension (`browser_*` tools, default on). Runtime library: [`playwright-core`](https://www.npmjs.com/package/playwright-core) (Apache-2.0). Persistent profile directory is `<agentDir>/extensions/browser/.profile` (`PI_CODING_AGENT_DIR` or `~/.pi/agent`), overridable with `PI_BROWSER_PROFILE`. Chromium is not bundled; install separately with `npx playwright-core install chromium`.
 
 ### `extras/macos/iterm2-status.ts`
 

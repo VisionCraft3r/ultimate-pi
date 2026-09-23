@@ -230,14 +230,13 @@ export default function browserExtension(pi: ExtensionAPI) {
     page = null;
   }
 
-  // Default-off gate. The browser tools collectively cost ~800 system-prompt
-  // tokens (snippets + guidelines), but are needed in a small minority of
-  // sessions. We keep all 8 tools registered so they appear in
-  // pi.getAllTools() and command discovery stays normal, but we strip them
-  // from the active set so their promptSnippet / promptGuidelines drop out
-  // of the system prompt. They become callable again when /browser on flips
-  // them back into the active set.
-  let enabled = false;
+  // Default-on gate. The browser tools collectively cost ~800 system-prompt
+  // tokens (snippets + guidelines). We keep all 8 tools registered so they
+  // appear in pi.getAllTools() and command discovery stays normal, and they
+  // start in the active set on a fresh session so browser_* is callable
+  // immediately. /browser off still strips them from the active set (and
+  // tears down the browser) for sessions that don't want the token cost.
+  let enabled = true;
 
   function setEnabled(on: boolean): void {
     const active = new Set(pi.getActiveTools());
@@ -273,7 +272,7 @@ export default function browserExtension(pi: ExtensionAPI) {
   // replays its entries when the extension re-inits) but not /new (fresh
   // session has no entries, so we default to off).
   pi.on("session_start", async (_event, ctx) => {
-    let want = false;
+    let want = true;
     for (const entry of ctx.sessionManager.getEntries()) {
       if (entry.type === "custom" && entry.customType === ENABLED_ENTRY_TYPE) {
         const data = entry.data as { on?: boolean } | undefined;
@@ -606,10 +605,11 @@ export default function browserExtension(pi: ExtensionAPI) {
     },
   });
 
-  // Default-off gate: tools stay registered (visible in pi.getAllTools(),
-  // command discovery normal) but their promptSnippet / promptGuidelines
-  // drop out of the system prompt and they're not callable until
-  // /browser on adds them back. The actual setActiveTools call happens in
-  // the session_start handler above, because pi forbids action methods
-  // during the factory.
+  // Default-on gate: tools stay registered (visible in pi.getAllTools(),
+  // command discovery normal) and start in the active set on a fresh
+  // session. /browser off strips their promptSnippet / promptGuidelines
+  // out of the system prompt and makes them uncallable until /browser on
+  // restores them. The actual setActiveTools call happens in the
+  // session_start handler above, because pi forbids action methods during
+  // the factory.
 }
