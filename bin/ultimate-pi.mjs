@@ -2,6 +2,7 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
 
 const SETUP_TOPICS = ["providers", "agents", "fallbacks", "jev", "memory", "extras"];
 const COMMANDS = ["install", "setup", "doctor", "uninstall"];
@@ -92,8 +93,17 @@ export function parseArgs(argv) {
   return options;
 }
 
+function mainModuleHref(entry) {
+  const resolved = resolve(entry);
+  try {
+    return pathToFileURL(realpathSync(resolved)).href;
+  } catch {
+    return pathToFileURL(resolved).href;
+  }
+}
+
 const isMain =
-  Boolean(process.argv[1]) && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+  Boolean(process.argv[1]) && mainModuleHref(process.argv[1]) === import.meta.url;
 
 if (isMain) {
   const options = parseArgs(process.argv.slice(2));

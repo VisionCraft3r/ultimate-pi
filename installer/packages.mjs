@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
@@ -36,9 +37,11 @@ function existingCredential(providers, id) {
 }
 
 function selfSpec(options = {}) {
-  // `--local` is Pi settings scope, not package source. Default is this checkout
-  // so clone install works before a GitHub repo exists. No hardcoded machine path.
-  if (options.published) return "git:github.com/VisionCraft3r/ultimate-pi";
+  // `--local` selects Pi settings scope, not a package source. A Git checkout is
+  // stable; an npx/npm-extracted directory is disposable, so install from Git.
+  if (options.published || !existsSync(path.join(ROOT, ".git"))) {
+    return "git:github.com/VisionCraft3r/ultimate-pi";
+  }
   return ROOT;
 }
 
