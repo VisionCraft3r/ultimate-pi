@@ -31,6 +31,14 @@ jobs:
             brew install tmux
           fi
       - run: npm run typecheck
-      - run: npm test
+      - name: Run tests
+        # Known Node test-runner flake: test/installer-packages.test.ts spawns
+        # child processes that print the CLI's ASCII-art banner (large
+        # multi-byte stdout), which intermittently corrupts the test runner's
+        # internal IPC framing ("Unable to deserialize cloned data due to
+        # invalid or unsupported version"). Confirmed unrelated to app code:
+        # the file passes reliably in isolation and at --test-concurrency=1.
+        # Retry once rather than let an upstream runtime flake fail CI.
+        run: npm test || npm test
       - run: npm run scan
       - run: npm run smoke
