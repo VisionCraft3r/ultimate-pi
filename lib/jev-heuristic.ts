@@ -67,6 +67,18 @@ export function formatUnavailablePrefix(reason: string): string {
   return `⚠ JEV unavailable (${reason}).`;
 }
 
+/**
+ * When live JEV cannot be reached, do not keyword-escalate into tier_1+.
+ * Stay in main (tier_0) so a 401/timeout cannot spawn planner/worker by accident.
+ */
+export function formatFailSoftTier0(reason: string): string {
+  return (
+    `${formatUnavailablePrefix(reason)} Fail-soft: tier_0 — answer in main, do not spawn. ` +
+    `Re-run triage only if routing is clearly wrong.\n` +
+    formatTriageResult("tier_0", 100)
+  );
+}
+
 export function formatHeuristicTriage(
   prompt: string,
   options?: { unavailableReason?: string },

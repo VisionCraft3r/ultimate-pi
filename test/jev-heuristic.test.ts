@@ -4,6 +4,7 @@ import {
 	classifyHeuristic,
 	HEURISTIC_MAX_CONFIDENCE,
 	HEURISTIC_UNCONFIGURED_PREFIX,
+	formatFailSoftTier0,
 	formatHeuristicTriage,
 } from "../lib/jev-heuristic.ts";
 
@@ -103,3 +104,11 @@ test("formatHeuristicTriage prefixes a visible heuristic-fallback warning", () =
 	assert.equal(text.startsWith(HEURISTIC_UNCONFIGURED_PREFIX), true);
 	assert.match(text, /Triage Result: tier_0/);
 });
+
+test("formatFailSoftTier0 stays tier_0 and never escalates", () => {
+	const text = formatFailSoftTier0("API returned HTTP 401");
+	assert.match(text, /Fail-soft: tier_0/);
+	assert.match(text, /Triage Result: tier_0/);
+	assert.doesNotMatch(text, /tier_1|tier_2|tier_3|tier_4/);
+});
+

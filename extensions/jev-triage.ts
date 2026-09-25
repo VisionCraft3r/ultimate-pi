@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import { isContinuationCrumb, normalizePrompt } from "../lib/continuation-crumbs.ts";
 import { resolveOpenRouterApiKey } from "../lib/openrouter-auth.ts";
 import { resolveJevEndpoint, resolveJevModel } from "../lib/jev-config.ts";
-import { formatHeuristicTriage } from "../lib/jev-heuristic.ts";
+import { formatFailSoftTier0 } from "../lib/jev-heuristic.ts";
 
 const CONTINUATION_PREFIX =
   /^(alright|all right|one more|also[, ]|instead |note |now,|now what|ok so |and also)\b/;
@@ -157,69 +157,144 @@ const TRIAGE_QUESTIONS = {
 
 const UI_TEST_NOUL_THRESHOLD = 0.75;
 const UI_TEST_CONFIDENCE_THRESHOLD = 0.7;
+const AUTO_FETCH_TIMEOUT_MS = 15_000;
+
+/** Env / session toggle. Default ON so triage always runs without model compliance. */
+function envAutoEnabled(): boolean {
+  const v = process.env.ULTIMATE_PI_JEV_AUTO?.trim().toLowerCase();
+  if (!v) return true;
+  return !["0", "false", "off", "no"].includes(v);
+}
+
+async function runTriage(
+  prompt: string,
+  ctx: ExtensionContext | undefined,
+  signal?: AbortSignal,
+): Promise<string> {
+  if (isContinuationCrumb(prompt)) {
+    return triageText("tier_0", 100);
+  }
+
+  const apiKey = resolveOpenRouterApiKey();
+  if (!apiKey) {
+    return formatFailSoftTier0("no API key — run ultimate-pi setup jev / set TYPESAFE_API_KEY");
+  }
+
+  const prior = shouldAttachPrior(prompt) ? priorUserRequest(ctx, prompt) : undefined;
+  const state = prior ? { request: prompt, prior_request: prior } : { request: prompt };
+
+  try {
+    const response = await fetch(resolveJevEndpoint(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: resolveJevModel(),
+        state,
+        questions: TRIAGE_QUESTIONS,
+      }),
+      signal,
+    });
+
+    if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
+    const data = await response.json();
+    const uiTest = data.answers?.is_ui_test;
+    const answer = data.answers?.task_tier;
+
+    const noul = typeof uiTest?.noul === "number" ? uiTest.noul : 0;
+    const noulConf = typeof uiTest?.confidence === "number" ? uiTest.confidence : undefined;
+    const noulConfident = noulConf === undefined || noulConf >= UI_TEST_CONFIDENCE_THRESHOLD;
+    if (noul >= UI_TEST_NOUL_THRESHOLD && noulConfident) {
+      const confidencePct = Math.round((noulConf ?? noul) * 100);
+      return triageText("tier_4_qa", confidencePct);
+    }
+
+    if (!answer || !answer.choice) {
+      return formatFailSoftTier0("malformed API response");
+    }
+
+    const confidencePct = Math.round((answer.confidence || 0) * 100);
+    return triageText(answer.choice, confidencePct);
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return formatFailSoftTier0("auto-triage timeout");
+    }
+    const reason = err instanceof Error ? err.message : String(err);
+    return formatFailSoftTier0(`network error: ${reason}`);
+  }
+}
+
+function shouldAutoTriage(prompt: string): boolean {
+  const trimmed = prompt.trim();
+  if (!trimmed) return false;
+  // Slash commands / bang-shell — not routing work
+  if (trimmed.startsWith("/") || trimmed.startsWith("!")) return false;
+  return true;
+}
 
 export default function (pi: ExtensionAPI) {
+  let autoEnabled = envAutoEnabled();
+  let evaluating = false;
+
+  pi.registerCommand("jev-auto", {
+    description: "Toggle automatic JEV triage before every user turn (ULTIMATE_PI_JEV_AUTO)",
+    handler: async (args, ctx) => {
+      const a = (args ?? "").trim().toLowerCase();
+      if (a === "on" || a === "true" || a === "1") autoEnabled = true;
+      else if (a === "off" || a === "false" || a === "0") autoEnabled = false;
+      else autoEnabled = !autoEnabled;
+      const msg = autoEnabled ? "JEV auto-triage ON" : "JEV auto-triage OFF";
+      if (ctx.hasUI) ctx.ui.notify(msg, "info");
+      else console.log(msg);
+    },
+  });
+
+  pi.on("before_agent_start", async (event, ctx) => {
+    if (!autoEnabled || evaluating || !shouldAutoTriage(event.prompt)) return undefined;
+
+    evaluating = true;
+    let resultText: string;
+    try {
+      const signal =
+        typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+          ? AbortSignal.timeout(AUTO_FETCH_TIMEOUT_MS)
+          : undefined;
+      resultText = await runTriage(event.prompt, ctx, signal);
+    } finally {
+      evaluating = false;
+    }
+
+    if (ctx.hasUI) {
+      const short = resultText.split(".")[0] ?? resultText;
+      ctx.ui.notify(`JEV auto: ${short}`, "info");
+    }
+
+    return {
+      message: {
+        customType: "jev_auto_triage",
+        content: resultText,
+        display: true,
+        details: { source: "before_agent_start", auto: true },
+      },
+      systemPrompt:
+        event.systemPrompt +
+        `\n\n## JEV auto-triage (already run — do NOT call jev_triage again this turn)\n${resultText}\nObey AGENTS.md routing for this tier. Only call \`jev_triage\` again if the user clearly changes the job mid-turn.\n`,
+    };
+  });
+
   pi.registerTool({
     name: "jev_triage",
     label: "JEV Triage Gateway",
-    description: "Classifies the user's exact request into a routing tier (tier_0, tier_1, tier_2, tier_3, tier_4_qa). Pass the user's wording verbatim — do not rewrite it. The tool attaches the previous user turn from the session as prior_request.",
+    description:
+      "Classifies the user's exact request into a routing tier (tier_0, tier_1, tier_2, tier_3, tier_4_qa). Pass the user's wording verbatim — do not rewrite it. Usually unnecessary: auto-triage runs on before_agent_start. Use only to re-classify mid-turn.",
     parameters: Type.Object({
-      prompt: Type.String({ description: "The user's exact request string, verbatim" })
+      prompt: Type.String({ description: "The user's exact request string, verbatim" }),
     }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
-      if (isContinuationCrumb(params.prompt)) {
-        return { content: [{ type: "text", text: triageText("tier_0", 100) }], details: {} };
-      }
-
-      const apiKey = resolveOpenRouterApiKey();
-      if (!apiKey) {
-        return { content: [{ type: "text", text: formatHeuristicTriage(params.prompt) }], details: {} };
-      }
-
-      const prior = shouldAttachPrior(params.prompt)
-        ? priorUserRequest(ctx, params.prompt)
-        : undefined;
-      const state = prior
-        ? { request: params.prompt, prior_request: prior }
-        : { request: params.prompt };
-
-      try {
-        const response = await fetch(resolveJevEndpoint(), {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: resolveJevModel(),
-            state,
-            questions: TRIAGE_QUESTIONS
-          })
-        });
-
-        if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
-        const data = await response.json();
-        const uiTest = data.answers?.is_ui_test;
-        const answer = data.answers?.task_tier;
-
-        const noul = typeof uiTest?.noul === "number" ? uiTest.noul : 0;
-        const noulConf = typeof uiTest?.confidence === "number" ? uiTest.confidence : undefined;
-        const noulConfident = noulConf === undefined || noulConf >= UI_TEST_CONFIDENCE_THRESHOLD;
-        if (noul >= UI_TEST_NOUL_THRESHOLD && noulConfident) {
-          const confidencePct = Math.round((noulConf ?? noul) * 100);
-          return { content: [{ type: "text", text: triageText("tier_4_qa", confidencePct) }], details: {} };
-        }
-
-        if (!answer || !answer.choice) {
-          return { content: [{ type: "text", text: formatHeuristicTriage(params.prompt, { unavailableReason: "malformed API response" }) }], details: {} };
-        }
-
-        const confidencePct = Math.round((answer.confidence || 0) * 100);
-        return { content: [{ type: "text", text: triageText(answer.choice, confidencePct) }], details: {} };
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: "text", text: formatHeuristicTriage(params.prompt, { unavailableReason: `network error: ${reason}` }) }], details: {} };
-      }
-    }
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const text = await runTriage(params.prompt, ctx, signal);
+      return { content: [{ type: "text", text }], details: {} };
+    },
   });
 }
