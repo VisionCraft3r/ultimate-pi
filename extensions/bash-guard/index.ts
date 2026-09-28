@@ -1,8 +1,16 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { DynamicBorder, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import type { SelectItem } from "@earendil-works/pi-tui";
 import { Container, SelectList, Text } from "@earendil-works/pi-tui";
 import { parse as shellParse } from "shell-quote";
+import {
+	formatJobLines,
+	jobsDir,
+	killRecordedJob,
+	listJobs,
+	resolveAgentDir,
+	wrapBashForJobs,
+} from "../../lib/jobs.ts";
 
 type Severity = "high" | "medium";
 
@@ -525,12 +533,55 @@ export function evaluateDisabledMainBash(command: string): BashGuardDecision | u
 //   sanitizeStatusText collapses runs of ASCII spaces via / +/g.
 const BASH_GUARD_STATUS_KEY = " bash-guard";
 
+function recordAllowedBash(command: string): string {
+	return wrapBashForJobs(command, jobsDir(resolveAgentDir()));
+}
+
+async function handleJobsCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
+	const ledger = jobsDir(resolveAgentDir());
+	const parts = args.trim().split(/\s+/).filter(Boolean);
+	if (parts[0] !== "kill") {
+		ctx.ui.notify(formatJobLines(listJobs(ledger)), "info");
+		return;
+	}
+
+	let pid = Number(parts[1]);
+	if (!Number.isInteger(pid) && ctx.hasUI) {
+		const jobs = listJobs(ledger);
+		if (jobs.length === 0) {
+			ctx.ui.notify("No background jobs.", "info");
+			return;
+		}
+		const choice = await ctx.ui.select(
+			"Kill a background job",
+			jobs.map((job) => `${job.pid}  ${job.agent}  ${job.command.slice(0, 60) || "(no command)"}`),
+		);
+		pid = Number(choice?.split(/\s+/)[0]);
+	}
+	if (!Number.isInteger(pid) || pid <= 1) {
+		ctx.ui.notify("Usage: /jobs kill <pid>", "warning");
+		return;
+	}
+	const killed = killRecordedJob(ledger, pid);
+	ctx.ui.notify(
+		killed ? `Killed ${killed.pid} (${killed.agent})` : `No recorded job with pid ${pid}`,
+		killed ? "info" : "warning",
+	);
+}
+
 export default function (pi: ExtensionAPI) {
+	pi.registerCommand("jobs", {
+		description: "List or kill background processes started by bash. /jobs kill <pid>",
+		handler: handleJobsCommand,
+	});
+
 	if (_isSubagent) {
 		// Subagent mode: hard-block catastrophic operations, no prompting.
 		pi.on("tool_call", async (event) => {
 			if (!isToolCallEventType("bash", event)) return;
-			return evaluateHeadlessBash(event.input.command);
+			const decision = evaluateHeadlessBash(event.input.command);
+			if (decision) return decision;
+			event.input.command = recordAllowedBash(event.input.command);
 		});
 		return;
 	}
@@ -597,11 +648,17 @@ export default function (pi: ExtensionAPI) {
 		// Disabled mode skips interactive prompting, but the documented
 		// MAIN_DISABLED_BLOCKED catastrophic floor still applies.
 		if (disabled) {
-			return evaluateDisabledMainBash(command);
+			const decision = evaluateDisabledMainBash(command);
+			if (decision) return decision;
+			event.input.command = recordAllowedBash(command);
+			return;
 		}
 
 		const risk = analyzeBashCommand(command);
-		if (!risk) return;
+		if (!risk) {
+			event.input.command = recordAllowedBash(command);
+			return;
+		}
 
 		const now = Date.now();
 		const lastAbort = recentlyAborted.get(command);
@@ -615,11 +672,15 @@ export default function (pi: ExtensionAPI) {
 
 		if (!ctx.hasUI && pi.getFlag("--bash-guard-auto-allow")) {
 			// Non-interactive mode: allow when explicitly requested.
+			event.input.command = recordAllowedBash(command);
 			return;
 		}
 
 		const choice = await promptRunOrAbort(ctx, command, risk);
-		if (choice === "run") return;
+		if (choice === "run") {
+			event.input.command = recordAllowedBash(command);
+			return;
+		}
 
 		recentlyAborted.set(command, now);
 		return {

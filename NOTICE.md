@@ -43,6 +43,8 @@ These remain `peerDependencies`. This package does not vendor them.
 - [pi-cache-graph](https://www.npmjs.com/package/pi-cache-graph) — Arnav Gupta, MIT.
 - [pi-graft](https://www.npmjs.com/package/pi-graft) — KSonny4, MIT.
 - [@spences10/pi-themes](https://www.npmjs.com/package/@spences10/pi-themes) — Scott Spence, MIT. Supplies the default `neon-noir` theme.
+- [pi-context-view](https://www.npmjs.com/package/pi-context-view) — Dmitry, MIT. Parent-only `/context` inspection. Adds no model instructions.
+- [@lucascardozo/pi-edit-guard](https://www.npmjs.com/package/@lucascardozo/pi-edit-guard) — Lucas Ivan Cardozo, MIT. Loaded only on child agents that already have `edit` or `write`.
 
 ---
 

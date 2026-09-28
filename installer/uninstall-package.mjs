@@ -15,6 +15,8 @@ export const ULTIMATE_PI_THIRD_PARTY_PREFIXES = [
   "npm:pi-lens",
   "npm:pi-graft",
   "npm:@spences10/pi-themes",
+  "npm:pi-context-view",
+  "npm:@lucascardozo/pi-edit-guard",
   "npm:@plannotator/pi-extension",
   "npm:pi-cache-graph",
   "npm:@gotgenes/pi-anthropic-auth",

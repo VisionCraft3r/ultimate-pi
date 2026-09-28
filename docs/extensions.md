@@ -22,6 +22,10 @@ On HTTP 429, switches the current turn to the next hop in `model-agents.json` (p
 
 Does not embed a fixed list of model ids.
 
+### `scout-budget`
+
+Caps `scout` at 20 tool rounds. A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one more turn to return the file and line map. A 21st round is blocked. The extension no-ops unless `PI_SUBAGENT_AGENT` is `scout`, so worker is unchanged. Install also passes `--no-lens-context` on the scout launch only: pi-lens stays loaded and its tools stay available, and its session-start and turn-end notes are not written into scout's prompt. Worker and planner do not get that flag.
+
 ### `model-agents`
 
 `/ModelAgents` edits the five role models and the 429 chains, and rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md`.
@@ -35,6 +39,8 @@ Gives the planner `handoff_spec` plus a silent-park `.ask` watchdog so a spec-re
 `/bash-guard` toggles the interactive Run/Abort prompt for risky shell commands in the main session. Subagents (`PI_SUBAGENT_DEPTH` ≥ 1) do not get that prompt: catastrophic patterns (`rm -r`, `sudo`, `curl|sh`, disk-wipe tools, and disguised one-liners) are hard-blocked. Disabling the interactive guard does not disable that floor.
 
 Does not allow a child to work around a block.
+
+`/jobs` wraps every bash command bash-guard allows. If that command still has background processes in the shell job table when it exits, each pid is written under `<agentDir>/jobs/<pid>/`. A process that detaches out of that job table is not recorded. A command bash-guard blocks is not wrapped. `/jobs` lists the live pids. `/jobs kill <pid>` stops that pid and its children, and only if the pid is in the ledger. With a UI, `/jobs kill` and no pid opens a picker. The ledger is shared. Worker can start jobs because it has bash. qa_tester loads this command through `jev_sentinel` and has no bash tool, so it can kill a job the worker started and cannot start one. The parent session can do both.
 
 ### `ask-user-question`
 
@@ -61,6 +67,10 @@ On session start, applies patch and minor npm updates that stay on known pins. M
 ### `prompt-snippets`
 
 `/snippets` or alt+s toggles small prepend/append instructions for the next message: ask-questions, delegate-exploration, diagnose-report, orchestrator-mode, session-kickoff, verify-not-assume. Toggles reset after each send.
+
+### Installed packages
+
+`pi-context-view` is required and parent-only. `/context` inspects the prompt. It adds no model instructions. `@lucascardozo/pi-edit-guard` is required and is loaded only on child agents that already have `edit` or `write`.
 
 ### `custom-header`
 

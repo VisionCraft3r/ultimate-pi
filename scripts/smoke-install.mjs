@@ -61,7 +61,7 @@ try {
   ]);
   if (/✖/.test(install.stdout + install.stderr)) throw new Error("install reported a failed check");
   const settings = JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8"));
-  for (const spec of ["npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes"]) {
+  for (const spec of ["npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes", "npm:pi-context-view", "npm:@lucascardozo/pi-edit-guard"]) {
     if (!settings.packages.includes(spec)) throw new Error(`missing required package ${spec}`);
   }
   for (const name of ["scout", "worker", "planner", "researcher", "qa_tester"]) {

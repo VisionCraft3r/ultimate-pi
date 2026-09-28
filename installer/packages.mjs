@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
 import { createBackupSession } from "./backup.mjs";
 import { DEPENDENCY_PATCHES, applyDependencyPatch } from "./dependency-patches.mjs";
+import { applyEditGuardChildGate } from "./edit-guard-child.mjs";
+import { applyScoutChildLaunch } from "./scout-child.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -18,6 +20,8 @@ const REQUIRED_PACKAGES = [
   "npm:pi-lens",
   "npm:pi-graft",
   "npm:@spences10/pi-themes",
+  "npm:pi-context-view",
+  "npm:@lucascardozo/pi-edit-guard",
 ];
 
 function isCancelled(value) {
@@ -247,6 +251,20 @@ export async function configurePackagesAndKeys(
       } else {
         p.log.info(`Dependency patch ${descriptor.name}: ${result.status}`);
       }
+    }
+    const editGuard = await applyEditGuardChildGate(options.agentDir);
+    patchResults.push({ name: "pi-edit-guard-child", status: editGuard.status, reason: editGuard.reason });
+    if (editGuard.status === "skipped") {
+      p.log.warn(`pi-edit-guard child gate skipped: ${editGuard.reason}`);
+    } else {
+      p.log.info(`pi-edit-guard child gate: ${editGuard.status}`);
+    }
+    const scoutLaunch = await applyScoutChildLaunch(options.agentDir);
+    patchResults.push({ name: "scout-child-launch", status: scoutLaunch.status, reason: scoutLaunch.reason });
+    if (scoutLaunch.status === "skipped") {
+      p.log.warn(`scout child launch skipped: ${scoutLaunch.reason}`);
+    } else {
+      p.log.info(`scout child launch: ${scoutLaunch.status}`);
     }
   }
 

@@ -26,7 +26,7 @@ Ultimate Pi is a batteries-included configuration and extension pack for the
 It wires up tiered task routing, a five-role subagent team, tool allowlisting,
 cross-provider rate-limit fallback, and a handful of quality-of-life
 extensions (bash safety guard, browser QA tools, web fetch/search, prompt
-snippets, required pi-lens/graft code intelligence, and optional memory/cache)
+snippets, required pi-lens/graft code intelligence, parent-only context view, edit-guard on editing agents, and optional memory/cache)
 into one installable package.
 
 **Ultimate Pi is not affiliated with Anthropic, OpenAI, Cursor, OpenRouter,
@@ -139,7 +139,7 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
    a local heuristic fallback if you skip it.
 6. **Observational memory** (optional) — a DeepSeek key to enable a lightweight
    session observer/consolidator.
-7. **Packages** — required pi-lens, pi-graft, and `@spences10/pi-themes`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset.
+7. **Packages** — required pi-lens, pi-graft, `@spences10/pi-themes`, pi-context-view, and `@lucascardozo/pi-edit-guard`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset.
 8. **Apply** — installs packages, merges `settings.json`, `auth.json`, and
    (for a local endpoint) `models.json`, with timestamped backups, and splices
    the routing doc into `AGENTS.md` between marker comments.
@@ -169,7 +169,7 @@ See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 
 | Agent | Role |
 |---|---|
-| `scout` | fast multi-file search and structure mapping |
+| `scout` | fast multi-file search and structure mapping; 20 tool rounds, then the file and line map |
 | `worker` | writes code, runs builds/tests |
 | `planner` | architecture breakdowns; `handoff_spec` opens the spec in Plannotator |
 | `researcher` | web research, external docs |
@@ -178,6 +178,11 @@ See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 Ultimate Pi does not install a video-ad role. A profile already at
 `agents/video-ads.md` is left in place. The next `ultimate-pi setup agents`
 rewrites the managed routing block and stops assigning that role.
+
+Scout launches with `--no-lens-context`. pi-lens stays loaded and its tools
+stay available. Its session-start and turn-end notes are not written into
+scout's prompt. Worker and planner do not get that flag. Worker has no
+tool-round ceiling.
 
 Change assignments any time with `ultimate-pi setup agents` or the in-Pi
 `/ModelAgents` command.
@@ -283,8 +288,10 @@ Flags:
 ```
 
 In-Pi commands: `/ModelAgents` (edit agent models and fallback chains),
-`/bash-guard`, `/browser`, `/snippets`, `/builtin-header`, and `/cache` /
-`/om` if those optional packages are installed.
+`/bash-guard`, `/jobs` (list background pids; `/jobs kill <pid>` stops a
+recorded pid and its children), `/context` (parent session), `/browser`,
+`/snippets`, `/builtin-header`, and `/cache` / `/om` if those optional
+packages are installed.
 
 On session start, `launch-update` applies patch and minor npm updates that
 stay on known pins, and copies a newer checkout from `ULTIMATE_PI_ROOT` only
@@ -309,7 +316,7 @@ Ultimate Pi builds on [Pi](https://pi.dev) (Mario Zechner / earendil-works,
 MIT) and a number of community packages: `pi-interactive-subagents`,
 `pi-observational-memory`, `@gotgenes/pi-anthropic-auth`,
 `@schultzp2020/pi-cursor`, `@plannotator/pi-extension`, `pi-lens`,
-`pi-cache-graph`, `pi-graft`, and `@spences10/pi-themes`, plus JEV (TypeSafe AI, via OpenRouter). Full
+`pi-cache-graph`, `pi-graft`, `@spences10/pi-themes`, `pi-context-view`, and `@lucascardozo/pi-edit-guard`, plus JEV (TypeSafe AI, via OpenRouter). Full
 detail, licenses, and copyright notices are in [NOTICE.md](./NOTICE.md).
 
 Thanks to [Eero Alvar](https://www.youtube.com/@EeroAlvar) for the Pi content

@@ -137,3 +137,17 @@ test("interactive analyzer flags xargs rm including piped forms", () => {
 	assert.equal(piped?.severity, "high");
 	assert.match(piped?.reasons.join(" ") ?? "", /xargs rm/);
 });
+
+test("allowed bash is wrapped for /jobs and a blocked command is not", async () => {
+	const { handlers } = mockMainSessionPi();
+	const allowed = { toolName: "bash" as const, input: { command: "ls -la" } };
+	const allowedResult = await handlers.tool_call(allowed, { hasUI: false });
+	assert.equal(allowedResult, undefined);
+	assert.match(allowed.input.command, /__pi_jobs_record/);
+	assert.match(allowed.input.command, /ls -la/);
+
+	const blocked = { toolName: "bash" as const, input: { command: "rm -rf /tmp/example" } };
+	const blockedResult = (await handlers.tool_call(blocked, { hasUI: false })) as { block?: boolean };
+	assert.equal(blockedResult?.block, true);
+	assert.equal(blocked.input.command, "rm -rf /tmp/example");
+});

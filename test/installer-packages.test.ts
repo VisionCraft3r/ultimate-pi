@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { configurePackagesAndKeys, assertGitAvailableForSpecs, gitMissingMessage } from "../installer/packages.mjs";
+import { ensureEditGuardChildGate } from "../installer/edit-guard-child.mjs";
+import { ensureScoutChildLaunch } from "../installer/scout-child.mjs";
 import { doctor } from "../installer/doctor.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -21,6 +23,8 @@ test("offline --yes with empty answers.packages still installs required lens, gr
   assert.ok(packages.includes("npm:pi-lens"), "required npm:pi-lens");
   assert.ok(packages.includes("npm:pi-graft"), "required npm:pi-graft");
   assert.ok(packages.includes("npm:@spences10/pi-themes"), "required npm:@spences10/pi-themes");
+  assert.ok(packages.includes("npm:pi-context-view"), "required npm:pi-context-view");
+  assert.ok(packages.includes("npm:@lucascardozo/pi-edit-guard"), "required npm:@lucascardozo/pi-edit-guard");
   assert.ok(packages.includes(SUBAGENTS), "required pinned interactive-subagents");
   assert.ok(packages.includes(ROOT), "self spec is checkout ROOT");
   assert.equal(path.isAbsolute(ROOT), true);
@@ -65,7 +69,15 @@ test("rejects bare answers.packages names before any pi install", async () => {
 test("doctor --offline checks settings source specs and ✖ when lens or graft is missing", async () => {
   const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-packages-"));
   try {
-    const required = [ROOT, SUBAGENTS, "npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes"];
+    const required = [
+      ROOT,
+      SUBAGENTS,
+      "npm:pi-lens",
+      "npm:pi-graft",
+      "npm:@spences10/pi-themes",
+      "npm:pi-context-view",
+      "npm:@lucascardozo/pi-edit-guard",
+    ];
     await writeFile(
       path.join(agentDir, "settings.json"),
       `${JSON.stringify({ packages: required }, null, 2)}\n`,
@@ -112,7 +124,17 @@ test("doctor accepts a relative local package spec, matching how `pi install <pa
       await writeFile(
         path.join(agentDir, "settings.json"),
         `${JSON.stringify(
-          { packages: [relativeSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes"] },
+          {
+            packages: [
+              relativeSpec,
+              SUBAGENTS,
+              "npm:pi-lens",
+              "npm:pi-graft",
+              "npm:@spences10/pi-themes",
+              "npm:pi-context-view",
+              "npm:@lucascardozo/pi-edit-guard",
+            ],
+          },
           null,
           2,
         )}\n`,
@@ -152,7 +174,17 @@ test("doctor accepts a forked git origin when package.json name and pi manifest 
     await writeFile(
       path.join(agentDir, "settings.json"),
       `${JSON.stringify(
-        { packages: [forkSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes"] },
+        {
+          packages: [
+            forkSpec,
+            SUBAGENTS,
+            "npm:pi-lens",
+            "npm:pi-graft",
+            "npm:@spences10/pi-themes",
+            "npm:pi-context-view",
+            "npm:@lucascardozo/pi-edit-guard",
+          ],
+        },
         null,
         2,
       )}\n`,
@@ -262,4 +294,55 @@ test("gitMissingMessage for optional-only git packages points at answers.package
   assert.match(message, /optional git-based package/);
   assert.match(message, /answers\.packages/);
   assert.doesNotMatch(message, /--minimal/);
+});
+
+const LAUNCHER_FIXTURE = `const CONTEXT_PACKAGES: { segments: string[]; tools: readonly string[] }[] = [
+  {
+    segments: ["npm", "node_modules", "@plannotator", "pi-extension"],
+    tools: ["plannotator_submit_plan", "plannotator_mark_done"],
+  },
+];
+
+export function contextExtensionsForChild(grantedTools: ReadonlySet<string>): { paths: string[]; tools: string[] } {
+  const paths: string[] = [];
+  const tools: string[] = [];
+  for (const pkg of CONTEXT_PACKAGES) {
+    const entries = ["ext.ts"];
+    if (entries.length === 0) continue;
+    paths.push(...entries);
+    tools.push(...pkg.tools);
+  }
+  return { paths, tools };
+}
+`;
+
+test("edit-guard child gate stays off a stock launcher and on the local context-package hook", () => {
+  const stock = ensureEditGuardChildGate("export function launch() { return true; }\n");
+  assert.equal(stock.status, "skipped");
+  assert.match(stock.reason ?? "", /CONTEXT_PACKAGES absent/);
+
+  const applied = ensureEditGuardChildGate(LAUNCHER_FIXTURE);
+  assert.equal(applied.status, "applied");
+  assert.match(applied.source, /whenTools: \["edit", "write"\]/);
+  assert.match(applied.source, /pkg\.whenTools && !pkg\.whenTools\.some/);
+  assert.equal(ensureEditGuardChildGate(applied.source).status, "already-applied");
+});
+
+const SANDBOX_FIXTURE = `    for (const extPath of extPaths) {
+      parts.push("-e", shellEscape(extPath));
+    }
+  }
+}
+`;
+
+test("scout child launch adds the lens flag only inside the sandbox loop", () => {
+  const missing = ensureScoutChildLaunch("export function launch() { return true; }\n");
+  assert.equal(missing.status, "skipped");
+
+  const applied = ensureScoutChildLaunch(SANDBOX_FIXTURE);
+  assert.equal(applied.status, "applied");
+  assert.match(applied.source, /loadout\.agent === "scout"/);
+  assert.match(applied.source, /--no-lens-context/);
+  assert.match(applied.source, /scout-budget\.ts/);
+  assert.equal(ensureScoutChildLaunch(applied.source).status, "already-applied");
 });

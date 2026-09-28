@@ -29,7 +29,7 @@ Every request hits `jev_triage` first. The classifier returns a tier; the orches
 | Agent | Typical trigger | Job |
 |---|---|---|
 | *(main / orchestrator)* | `tier_0`, or coordinating any other tier | Talks to the user, launches roles, reviews planner specs |
-| `scout` | `tier_2` | Fast multi-file search and structure mapping |
+| `scout` | `tier_2` | Fast multi-file search and structure mapping. Stops after 20 tool rounds |
 | `worker` | `tier_1`, after scout (`tier_2`), after planner handoff (`tier_3`) | Writes code, runs builds/tests |
 | `planner` | `tier_3` | Architecture breakdowns; emits a spec via `handoff_spec` |
 | `researcher` | orchestrator decision (external docs / web) | Web research, third-party docs |
@@ -64,6 +64,10 @@ flowchart TB
 ```
 
 At most three worker panes run at once. Each of `scout`, `worker`, `planner`, `researcher`, and `qa_tester` gets its own tmux pane. The orchestrator stays in the original session and talks to those panes; it does not share a process with them.
+
+Scout launches with `--no-lens-context` and `extensions/scout-budget.ts`. A tool round is one assistant message that contains tool calls. Round 20 still runs, then scout has one chance to return the file and line map, and a 21st round is blocked. pi-lens stays loaded. Its tools stay available. The session-start and turn-end notes are not written into scout's prompt. Worker and planner do not get that flag. Worker is not capped.
+
+Background processes left by an allowed bash command are recorded under `<agentDir>/jobs`. `/jobs kill <pid>` stops a recorded pid and its children. Worker can start those processes. qa_tester can kill them and cannot start them. The parent session can do both.
 
 ## Tool allowlisting
 

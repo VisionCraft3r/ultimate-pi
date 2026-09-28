@@ -125,6 +125,12 @@ function physicallyInstalled(agentDir, kind, matchedSources) {
   if (kind === "npm:@spences10/pi-themes") {
     return existsSync(path.join(agentDir, "npm", "node_modules", "@spences10", "pi-themes"));
   }
+  if (kind === "npm:pi-context-view") {
+    return existsSync(path.join(agentDir, "npm", "node_modules", "pi-context-view"));
+  }
+  if (kind === "npm:@lucascardozo/pi-edit-guard") {
+    return existsSync(path.join(agentDir, "npm", "node_modules", "@lucascardozo", "pi-edit-guard"));
+  }
   return false;
 }
 
@@ -139,6 +145,8 @@ async function checkRequiredPackages(agentDir, options = {}) {
     { id: "npm:pi-lens", match: (spec) => npmPackageName(spec) === "pi-lens" },
     { id: "npm:pi-graft", match: (spec) => npmPackageName(spec) === "pi-graft" },
     { id: "npm:@spences10/pi-themes", match: (spec) => npmPackageName(spec) === "@spences10/pi-themes" },
+    { id: "npm:pi-context-view", match: (spec) => npmPackageName(spec) === "pi-context-view" },
+    { id: "npm:@lucascardozo/pi-edit-guard", match: (spec) => npmPackageName(spec) === "@lucascardozo/pi-edit-guard" },
   ];
 
   const missingSettings = [];
@@ -164,7 +172,7 @@ async function checkRequiredPackages(agentDir, options = {}) {
   const ok = problems.length === 0;
   const detail = ok
     ? options.offline
-      ? "settings.json lists self, interactive-subagents, npm:pi-lens, npm:pi-graft, npm:@spences10/pi-themes"
+      ? "settings.json lists self, interactive-subagents, npm:pi-lens, npm:pi-graft, npm:@spences10/pi-themes, npm:pi-context-view, npm:@lucascardozo/pi-edit-guard"
       : "required packages present in settings.json and installed"
     : problems.join("; ");
   return mark(ok, "required packages", detail);

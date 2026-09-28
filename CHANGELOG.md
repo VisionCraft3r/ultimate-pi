@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ask_user_question` in child sessions** parks the question in the `.ask` sidecar and tells the child to wait. Option helpers live in `lib/`, not `extensions/`, so Pi does not try to load them as extensions.
 - **`launch-update`** on session start applies patch and minor npm updates that stay on known pins, and copies a newer checkout into the agent dir only after that checkout's tests pass. Point it at a checkout with `ULTIMATE_PI_ROOT`. Major bumps stay put.
 - **`qa_tester`** profile sets `thinking: medium`.
+- **`/jobs`** records background processes left by bash commands bash-guard allows, under `<agentDir>/jobs`. `/jobs` lists them. `/jobs kill <pid>` stops a recorded pid and its children. Worker can start them. qa_tester can kill them and cannot start them. The parent session can do both.
+- **Scout tool-round ceiling.** Scout stops after 20 tool rounds (one assistant message that contains tool calls). Round 20 still runs, then scout has one chance to return the file and line map. A 21st round is blocked. Worker is unchanged.
+- **Scout `--no-lens-context`.** pi-lens stays loaded and its tools stay available. Session-start and turn-end notes are not written into scout's prompt. Worker and planner do not get the flag.
+- **`pi-context-view`** is required. Parent-only `/context`. It adds no model instructions.
+- **`@lucascardozo/pi-edit-guard`** is required and loads only on child agents that already have `edit` or `write`.
 
 ### Removed
 

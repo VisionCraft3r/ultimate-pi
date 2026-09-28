@@ -42,6 +42,16 @@ Install and `ultimate-pi setup agents` / `setup fallbacks` fill these settings o
 
 On macOS, `--yes` and the extras prompt (preselected) enable the completion beep. Setup appends the snippet from `extras/macos/completion-beep.md` after the managed block, and does not append it twice. iTerm2 status stays opt-in. Linux and Windows do not get the beep: `afplay` is macOS-only.
 
+## Background jobs
+
+bash-guard wraps every bash command it allows. Background pids still in the shell job table are written under `<agentDir>/jobs`. `/jobs` lists them. `/jobs kill <pid>` stops that pid and its children, and refuses a pid that was not recorded. Worker starts them. qa_tester has no bash tool, so it can kill a recorded job and cannot start one. The parent session can do both.
+
+## Scout stops after 20 tool rounds
+
+A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one chance to return the file and line map. A 21st round is blocked. Worker is unchanged. The ceiling is also written in `templates/agents/scout.md`.
+
+Scout launches with `--no-lens-context`. pi-lens stays loaded, and its tools stay available. The session-start and turn-end notes are not written into scout's prompt. Worker and planner do not get that flag.
+
 ## Quota switches stay inside the models you enabled
 
 `quota-fallback` still reads `model-agents.json` in the usual order: per-agent chain, then per-provider chain, then a derived default. When `enabledModels` or the session scoped-model list has entries, step three is skipped. A hop from the file is used only when that `provider/id` is in the combined list. An empty list keeps the derived default.
