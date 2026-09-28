@@ -45,8 +45,10 @@ third party. See [NOTICE.md](./NOTICE.md) for full attribution.
   explicit `--tools` allowlist; nothing is inherited by accident.
 - **Cross-provider 429 fallback** — configurable per-provider and per-agent
   fallback chains so a quota hit on one provider fails over automatically.
-- **Planner spec handoff** — a `handoff_spec` tool and `.ask` silent-park
-  watchdog for spec-ready plan review.
+  When `enabledModels` or the session scoped-model list is set, hops stay
+  inside that list.
+- **Planner spec handoff** — `handoff_spec` opens the spec in the Plannotator
+  browser, then parks with the `.ask` silent-park watchdog.
 - **bash-guard** — a safety net around destructive shell commands, including
   a catastrophic-operation floor that applies even when the interactive guard
   is disabled.
@@ -94,7 +96,8 @@ rollback:
   depends on `tmux`).
 - Node.js `>=22.19.0`, `git`, `tmux`.
 - At least one configured model provider (Anthropic, OpenAI Codex, Cursor,
-  OpenRouter, DeepSeek, OpenAI, or another OpenAI-compatible provider).
+  OpenRouter, DeepSeek, OpenAI, another API-key provider, or a local
+  OpenAI-compatible server).
 - Browser/QA tools (`qa_tester`, `browser_*`) need Chromium installed separately:
   `npx playwright-core install chromium`. See
   [extensions/browser/README.md](./extensions/browser/README.md) for details.
@@ -127,7 +130,8 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
 1. **Preflight** — checks Node, `pi` on `PATH`, `tmux`, platform, and the
    target agent directory.
 2. **Providers** — select and authenticate one or more model providers
-   (OAuth via Pi's `/login`, or a masked API-key prompt).
+   (OAuth via Pi's `/login`, a masked API-key prompt, or a local
+   OpenAI-compatible endpoint: base URL and model ids in `models.json`).
 3. **Agent models** — assign a primary model to each of the six agent roles.
 4. **Fallbacks** — configure global per-provider 429 chains and optional
    per-agent overrides.
@@ -135,10 +139,10 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
    a local heuristic fallback if you skip it.
 6. **Observational memory** (optional) — a DeepSeek key to enable a lightweight
    session observer/consolidator.
-7. **Packages** — required pi-lens, pi-graft, and `@spences10/pi-themes`; optional plannotator and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset.
-8. **Apply** — installs packages, merges `settings.json` and `auth.json`
-   (with timestamped backups), and splices the routing doc into `AGENTS.md`
-   between marker comments.
+7. **Packages** — required pi-lens, pi-graft, and `@spences10/pi-themes`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset.
+8. **Apply** — installs packages, merges `settings.json`, `auth.json`, and
+   (for a local endpoint) `models.json`, with timestamped backups, and splices
+   the routing doc into `AGENTS.md` between marker comments.
 9. **macOS extras** (darwin only) — completion beep is on by default; iTerm2 status line stays opt-in.
 10. **Doctor** — a self-check summarizing what's configured and what still
     needs attention.
@@ -167,7 +171,7 @@ See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 |---|---|
 | `scout` | fast multi-file search and structure mapping |
 | `worker` | writes code, runs builds/tests |
-| `planner` | architecture breakdowns, spec-ready handoff |
+| `planner` | architecture breakdowns; `handoff_spec` opens the spec in Plannotator |
 | `researcher` | web research, external docs |
 | `qa_tester` | drives a live browser/UI |
 | `video-ads` | HyperFrames video ads and promos (replaces `worker` for that leaf only) |
@@ -194,8 +198,10 @@ Ultimate Pi configures two layers of rate-limit fallback, stored in
 
 Resolution order on a 429: `agentFallbacks[<agent>]` (or `main` for the
 orchestrator) → `fallbacks[<provider>]` → a derived default chain across
-configured providers → no fallback (logged once). Re-run this step any time
-with `ultimate-pi setup fallbacks`.
+configured providers → no fallback (logged once). When `enabledModels` or the
+session scoped-model list is non-empty, the derived default is skipped and a
+written hop is used only if that `provider/id` is in the list. Re-run this
+step any time with `ultimate-pi setup fallbacks`.
 
 ## JEV routing
 
@@ -248,7 +254,9 @@ Subagents launch with `--no-extensions` and an explicit `--tools` allowlist
 from their agent profile, so no tool is inherited by accident; a handful of
 extensions (like `jev_sentinel`) re-inject themselves into child sessions via
 `registerToolExtension`. Quota-fallback listens for 429s and switches models
-mid-session using the fallback chains above. See
+mid-session using the fallback chains above, staying inside an enabled-model
+list when one is set. `handoff_spec` waits for Plannotator approval before
+the parent sees the spec. See
 [docs/architecture.md](./docs/architecture.md) for the full picture.
 
 ## Commands
@@ -276,6 +284,10 @@ Flags:
 In-Pi commands: `/ModelAgents` (edit agent models and fallback chains),
 `/bash-guard`, `/browser`, `/snippets`, `/builtin-header`, and `/cache` /
 `/om` if those optional packages are installed.
+
+On session start, `launch-update` applies patch and minor npm updates that
+stay on known pins, and copies a newer checkout from `ULTIMATE_PI_ROOT` only
+after that checkout's tests pass. Major bumps stay put.
 
 ## Security & privacy
 
