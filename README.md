@@ -23,7 +23,7 @@
 
 Ultimate Pi is a batteries-included configuration and extension pack for the
 [Pi coding agent](https://pi.dev) by Mario Zechner ([earendil-works/pi](https://github.com/earendil-works/pi)).
-It wires up tiered task routing, a five-role subagent team, tool allowlisting,
+It wires up tiered task routing, a six-role subagent team, tool allowlisting,
 cross-provider rate-limit fallback, and a handful of quality-of-life
 extensions (bash safety guard, browser QA tools, web fetch/search, prompt
 snippets, required pi-lens/graft code intelligence, and optional memory/cache)
@@ -37,8 +37,10 @@ third party. See [NOTICE.md](./NOTICE.md) for full attribution.
 
 - **JEV tiered routing** — every request is classified into `tier_0`…`tier_4_qa`
   so cheap/local work stays in the main session and complex work fans out.
-- **Five-role subagent team** — `scout`, `worker`, `planner`, `researcher`,
-  `qa_tester`, each with its own tool allowlist and model.
+- **Six-role subagent team** — `scout`, `worker`, `planner`, `researcher`,
+  `qa_tester`, and `video-ads`, each with its own tool allowlist and a model
+  you assign at install. See [docs/improvements.md](./docs/improvements.md)
+  and [docs/extensions.md](./docs/extensions.md).
 - **Tool allowlisting** — subagents launch with `--no-extensions` and an
   explicit `--tools` allowlist; nothing is inherited by accident.
 - **Cross-provider 429 fallback** — configurable per-provider and per-agent
@@ -126,18 +128,18 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
    target agent directory.
 2. **Providers** — select and authenticate one or more model providers
    (OAuth via Pi's `/login`, or a masked API-key prompt).
-3. **Agent models** — assign a primary model to each of the five agent roles.
+3. **Agent models** — assign a primary model to each of the six agent roles.
 4. **Fallbacks** — configure global per-provider 429 chains and optional
    per-agent overrides.
 5. **JEV** (optional) — an OpenRouter key for tiered routing; skippable, with
    a local heuristic fallback if you skip it.
 6. **Observational memory** (optional) — a DeepSeek key to enable a lightweight
    session observer/consolidator.
-7. **Packages** — required pi-lens and pi-graft; optional plannotator and pi-cache-graph.
+7. **Packages** — required pi-lens, pi-graft, and `@spences10/pi-themes`; optional plannotator and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset.
 8. **Apply** — installs packages, merges `settings.json` and `auth.json`
    (with timestamped backups), and splices the routing doc into `AGENTS.md`
    between marker comments.
-9. **macOS extras** (optional, darwin only) — completion beep, iTerm2 status line.
+9. **macOS extras** (darwin only) — completion beep is on by default; iTerm2 status line stays opt-in.
 10. **Doctor** — a self-check summarizing what's configured and what still
     needs attention.
 
@@ -167,6 +169,7 @@ See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 | `planner` | architecture breakdowns, spec-ready handoff |
 | `researcher` | web research, external docs |
 | `qa_tester` | drives a live browser/UI |
+| `video-ads` | HyperFrames video ads and promos (replaces `worker` for that leaf only) |
 
 Change assignments any time with `ultimate-pi setup agents` or the in-Pi
 `/ModelAgents` command.
@@ -232,10 +235,12 @@ flowchart LR
     J -->|tier_2| S[scout] --> W
     J -->|tier_3| P[planner] --> W
     J -->|tier_4_qa| Q[qa_tester]
+    O -->|video ad leaf| V[video-ads]
     W --> T[tmux pane]
     S --> T
     P --> T
     Q --> T
+    V --> T
 ```
 
 Subagents launch with `--no-extensions` and an explicit `--tools` allowlist
@@ -290,7 +295,7 @@ Ultimate Pi builds on [Pi](https://pi.dev) (Mario Zechner / earendil-works,
 MIT) and a number of community packages: `pi-interactive-subagents`,
 `pi-observational-memory`, `@gotgenes/pi-anthropic-auth`,
 `@schultzp2020/pi-cursor`, `@plannotator/pi-extension`, `pi-lens`,
-`pi-cache-graph`, and `pi-graft`, plus JEV (TypeSafe AI, via OpenRouter). Full
+`pi-cache-graph`, `pi-graft`, and `@spences10/pi-themes`, plus JEV (TypeSafe AI, via OpenRouter). Full
 detail, licenses, and copyright notices are in [NOTICE.md](./NOTICE.md).
 
 Thanks to [Eero Alvar](https://www.youtube.com/@EeroAlvar) for the Pi content

@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0-alpha] — 2026-09-28
+
+### Added
+
+- **Routing manual** in the managed `AGENTS.md` block: continuation crumbs, tier rules, a cap of 3 concurrent implementation panes, `subagent_question` handling, cache discipline, and the grantable tool list. Model ids stay in the parameterized agent table.
+- **`video-ads` role** for HyperFrames / promo leaves, with installer-assigned models (OpenAI Codex preferred when that provider is configured) and skill discovery that does not hardcode a home path
+- **Preference defaults** applied only when unset: `neon-noir` theme, visible thinking, compaction, and graft hit/char limits. Observational memory starts enabled when it is installed. `npm:@spences10/pi-themes` is now required.
+- **macOS completion beep** is the default extra on darwin (`--yes` and the preselected prompt). The snippet is appended outside the managed markers and is not duplicated. iTerm2 status stays opt-in.
+- Docs: [docs/extensions.md](./docs/extensions.md) and [docs/improvements.md](./docs/improvements.md)
+
+### Security
+
+- Install does not copy agent model lists, API keys, `auth.json`, graft filesystem roots, sessions, or trust files from any maintainer machine.
+
 ## [1.0.0-alpha] — 2026-09-23
 
 First public-release-candidate build, driven by a pre-release stress test (installer, provider/model assumptions, bash-guard safety, and uninstall completeness). Tagged `-alpha` per [SemVer](https://semver.org/spec/v2.0.0.html#spec-item-9): public API/CLI surface may still change before `1.0.0`.

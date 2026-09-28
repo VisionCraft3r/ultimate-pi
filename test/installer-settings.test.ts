@@ -6,8 +6,12 @@ import path from "node:path";
 import {
   mergeSettings,
   applyAgentsMdBlock,
+  applyPreferenceDefaults,
   applySettings,
+  fillMissing,
+  PREFERENCE_DEFAULTS,
 } from "../installer/settings.mjs";
+import { applyEnabledExtras } from "../installer/extras.mjs";
 
 async function makeTempDir() {
   return mkdtemp(path.join(tmpdir(), "ultimate-pi-settings-test-"));
@@ -39,6 +43,50 @@ test("mergeSettings creates settings.json when absent", async () => {
     await mergeSettings(dir, { packages: ["a"] });
     const next = JSON.parse(await readFile(path.join(dir, "settings.json"), "utf8"));
     assert.deepEqual(next.packages, ["a"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("preference defaults fill missing keys and leave an existing theme alone", async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(
+      path.join(dir, "settings.json"),
+      JSON.stringify({ theme: "dark", "graft-context": { enabled: false, managedRoots: ["/keep"] } }, null, 2),
+    );
+    const next = await applyPreferenceDefaults(dir, { memoryInstalled: true });
+    assert.equal(next.theme, "dark");
+    assert.equal(next.hideThinkingBlock, false);
+    assert.equal(next.compaction.reserveTokens, PREFERENCE_DEFAULTS.compaction.reserveTokens);
+    assert.equal(next.compaction.keepRecentTokens, PREFERENCE_DEFAULTS.compaction.keepRecentTokens);
+    assert.equal(next["graft-context"].enabled, false);
+    assert.equal(next["graft-context"].maxHits, 4);
+    assert.deepEqual(next["graft-context"].managedRoots, ["/keep"]);
+    assert.equal(next["observational-memory"].enabledByDefault, true);
+    assert.equal(next["observational-memory"].models, undefined);
+    assert.deepEqual(fillMissing({ theme: "keep" }, { theme: "neon-noir", hideThinkingBlock: false }).theme, "keep");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("completion beep is appended outside the managed markers and is not duplicated", async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(
+      path.join(dir, "AGENTS.md"),
+      "<!-- ultimate-pi:begin -->\nrouting\n<!-- ultimate-pi:end -->\n\n# My notes\n",
+    );
+    await applyEnabledExtras(dir, ["completion-beep"]);
+    await applyEnabledExtras(dir, ["completion-beep"]);
+    const text = await readFile(path.join(dir, "AGENTS.md"), "utf8");
+    assert.equal((text.match(/# COMPLETION BEEP/g) ?? []).length, process.platform === "darwin" ? 1 : 0);
+    if (process.platform === "darwin") {
+      assert.ok(text.indexOf("<!-- ultimate-pi:end -->") < text.indexOf("# COMPLETION BEEP"));
+      assert.match(text, /# My notes/);
+      assert.doesNotMatch(text, /\/Users\//);
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -89,6 +137,7 @@ test("applySettings persists providerChains and agentFallbacks into model-agents
       planner: { provider: "anthropic", model: "claude-opus-4.6" },
       researcher: { provider: "openai-codex", model: "gpt-5.4" },
       qa_tester: { provider: "openrouter", model: "openai/gpt-4.1-mini" },
+      "video-ads": { provider: "openai-codex", model: "gpt-5.4" },
     };
     const providerChains = {
       anthropic: [{ provider: "openai-codex", id: "gpt-5.4" }],
@@ -161,6 +210,7 @@ test("applySettings backs up preexisting settings, model-agents, AGENTS.md, and 
       planner: assignment,
       researcher: assignment,
       qa_tester: assignment,
+      "video-ads": assignment,
     };
 
     await applySettings({ agentDir: dir }, { agentAssignments, packages: [] });

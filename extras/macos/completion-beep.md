@@ -1,7 +1,6 @@
-# Completion beep (macOS extra, opt-in)
+# Completion beep (macOS extra)
 
-This snippet is **macOS-only** and **optional**. The installer offers it only on `darwin`.
-Paste it into your own `AGENTS.md` (inside the Ultimate Pi marker block if you use one) if you want an audible ping when the **main session** finishes a turn.
+This snippet is **macOS-only**. On darwin, `ultimate-pi install` and `ultimate-pi setup extras` append it **outside** the `<!-- ultimate-pi:begin/end -->` markers when the completion-beep extra is enabled. `--yes` enables it. The extras prompt preselects it; clear it to skip. It is not applied on Linux or Windows.
 
 The terminal bell character (`\a`) is often disabled or silent, so this uses `afplay` against a built-in macOS system sound instead.
 

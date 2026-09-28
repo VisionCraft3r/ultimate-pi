@@ -1,10 +1,10 @@
 # Architecture
 
-Ultimate Pi sits on top of the [Pi coding agent](https://pi.dev). The main Pi session is the **orchestrator**. Incoming work is classified, then either answered in place or fanned out to a five-role subagent team. Each subagent runs in its own [tmux](https://github.com/tmux/tmux) pane via [`pi-interactive-subagents`](https://github.com/AmosIBoukir/pi-interactive-subagents) (HazAT's original plus Amos Blomqvist's tmux-only fork). See [NOTICE.md](../NOTICE.md) for attribution.
+Ultimate Pi sits on top of the [Pi coding agent](https://pi.dev). The main Pi session is the **orchestrator**. Incoming work is classified, then either answered in place or fanned out to a six-role subagent team. Each subagent runs in its own [tmux](https://github.com/tmux/tmux) pane via [`pi-interactive-subagents`](https://github.com/AmosIBoukir/pi-interactive-subagents) (HazAT's original plus Amos Blomqvist's tmux-only fork). See [NOTICE.md](../NOTICE.md) for attribution. The session rules users actually follow are in [improvements.md](./improvements.md); each extension is in [extensions.md](./extensions.md).
 
 This page covers four pieces that work together:
 
-1. JEV routing and the five agent roles
+1. JEV routing and the six agent roles
 2. Tool allowlisting (and the few extensions that re-inject into child sessions)
 3. Cross-provider 429 / quota fallback
 4. Planner spec handoff before workers fan out
@@ -21,6 +21,7 @@ user → orchestrator (main session)
             → tier_2      scout, then worker
             → tier_3      planner → spec-ready review → workers
             → tier_4_qa   qa_tester (live browser/UI)
+            → video ad    video-ads in place of worker (same tier rules)
             → researcher  spawned when the orchestrator needs external docs
 ```
 
@@ -34,6 +35,7 @@ Every request hits `jev_triage` first. The classifier returns a tier; the orches
 | `planner` | `tier_3` | Architecture breakdowns; emits a spec via `handoff_spec` |
 | `researcher` | orchestrator decision (external docs / web) | Web research, third-party docs |
 | `qa_tester` | `tier_4_qa` | Drives a live browser/UI |
+| `video-ads` | video ad / HyperFrames leaf at tier 1, 2, or 3 | Builds the composition; not used for general code |
 
 `tier_4_qa` is composed from a UI-likelihood threshold (`noul ≥ 0.75`) and a confidence threshold (`≥ 0.7`). Low-confidence results (below 70% for `tier_3` / `tier_4_qa`, below 50% otherwise) are flagged rather than treated as a hard route. Without an OpenRouter key, triage falls back to a local keyword heuristic and prints `⚠ JEV not configured`.
 
@@ -52,6 +54,7 @@ flowchart TB
     P -->|handoff_spec + .ask park| O
     O -->|spec-ready review| W
     J -->|tier_4_qa live UI| Q[qa_tester]
+    O -->|video ad leaf| V[video-ads]
     O -->|external docs needed| R[researcher]
 
     subgraph tmux ["tmux panes via pi-interactive-subagents"]
@@ -60,10 +63,11 @@ flowchart TB
         P
         R
         Q
+        V
     end
 ```
 
-Each of `scout`, `worker`, `planner`, `researcher`, and `qa_tester` gets its own tmux pane. The orchestrator stays in the original session and talks to those panes; it does not share a process with them.
+At most three implementation panes (`worker` or `video-ads`) run at once. Each of `scout`, `worker`, `planner`, `researcher`, `qa_tester`, and `video-ads` gets its own tmux pane. The orchestrator stays in the original session and talks to those panes; it does not share a process with them.
 
 ## Tool allowlisting
 

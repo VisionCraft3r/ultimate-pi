@@ -20,6 +20,7 @@ test("offline --yes with empty answers.packages still installs required lens, gr
 
   assert.ok(packages.includes("npm:pi-lens"), "required npm:pi-lens");
   assert.ok(packages.includes("npm:pi-graft"), "required npm:pi-graft");
+  assert.ok(packages.includes("npm:@spences10/pi-themes"), "required npm:@spences10/pi-themes");
   assert.ok(packages.includes(SUBAGENTS), "required pinned interactive-subagents");
   assert.ok(packages.includes(ROOT), "self spec is checkout ROOT");
   assert.equal(path.isAbsolute(ROOT), true);
@@ -64,7 +65,7 @@ test("rejects bare answers.packages names before any pi install", async () => {
 test("doctor --offline checks settings source specs and ✖ when lens or graft is missing", async () => {
   const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-packages-"));
   try {
-    const required = [ROOT, SUBAGENTS, "npm:pi-lens", "npm:pi-graft"];
+    const required = [ROOT, SUBAGENTS, "npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes"];
     await writeFile(
       path.join(agentDir, "settings.json"),
       `${JSON.stringify({ packages: required }, null, 2)}\n`,
@@ -111,7 +112,7 @@ test("doctor accepts a relative local package spec, matching how `pi install <pa
       await writeFile(
         path.join(agentDir, "settings.json"),
         `${JSON.stringify(
-          { packages: [relativeSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft"] },
+          { packages: [relativeSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes"] },
           null,
           2,
         )}\n`,
@@ -151,7 +152,7 @@ test("doctor accepts a forked git origin when package.json name and pi manifest 
     await writeFile(
       path.join(agentDir, "settings.json"),
       `${JSON.stringify(
-        { packages: [forkSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft"] },
+        { packages: [forkSpec, SUBAGENTS, "npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes"] },
         null,
         2,
       )}\n`,

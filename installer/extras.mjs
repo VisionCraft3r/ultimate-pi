@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const EXTRAS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ITERM_STATUS_SRC = path.join(EXTRAS_DIR, "..", "extras", "macos", "iterm2-status.ts");
 const COMPLETION_BEEP_DOC = path.join(EXTRAS_DIR, "..", "extras", "macos", "completion-beep.md");
+const AGENTS_MD_FILE = "AGENTS.md";
+const DEFAULT_BEEP_SNIPPET = `# COMPLETION BEEP
+After finishing a task/response in this main session, play an audible completion sound: \`afplay /System/Library/Sounds/Ping.aiff\`. The terminal bell character (\`\\a\`) is not reliable (bell often disabled/silent) — use \`afplay\` instead.`;
 
 function isCancelled(value) {
   if (p.isCancel(value)) {
@@ -30,7 +33,7 @@ export async function configureExtras(options) {
   }
 
   if (options.yes || options.dryRun || options.answers) {
-    return { enabledExtras: [] };
+    return { enabledExtras: ["completion-beep"] };
   }
 
   p.log.step("macOS extras (optional)");
@@ -53,6 +56,7 @@ export async function configureExtras(options) {
           hint: "plays a short sound (afplay) when Ultimate Pi finishes a turn",
         },
       ],
+      initialValues: ["completion-beep"],
       required: false,
     }),
   );
@@ -76,8 +80,7 @@ export async function configureExtras(options) {
       // fall back to the default snippet above
     }
     p.log.info(
-      `Completion beep: add this to your AGENTS.md if you want it — "${snippet}". ` +
-        "Not applied automatically; it's a personal preference, not shared config.",
+      `Completion beep: setup appends this outside the managed AGENTS.md markers — "${snippet}".`,
     );
   }
 
@@ -86,4 +89,38 @@ export async function configureExtras(options) {
   }
 
   return { enabledExtras };
+}
+
+export async function completionBeepSnippet() {
+  try {
+    const doc = await fs.readFile(COMPLETION_BEEP_DOC, "utf8");
+    const match = doc.match(/```markdown\n([\s\S]*?)```/);
+    if (match?.[1]?.trim()) return match[1].trim();
+  } catch {
+    // fall through to the built-in snippet
+  }
+  return DEFAULT_BEEP_SNIPPET;
+}
+
+/**
+ * On macOS, append the completion-beep snippet after the managed AGENTS.md
+ * block when that extra is enabled and the snippet is not already present.
+ */
+export async function applyEnabledExtras(agentDir, enabledExtras = []) {
+  if (process.platform !== "darwin") return;
+  if (!enabledExtras.includes("completion-beep")) return;
+  const snippet = await completionBeepSnippet();
+  const file = path.join(agentDir, AGENTS_MD_FILE);
+  let text = "";
+  try {
+    text = await fs.readFile(file, "utf8");
+  } catch (err) {
+    if (err.code !== "ENOENT") throw err;
+  }
+  if (text.includes("# COMPLETION BEEP") || text.includes("afplay /System/Library/Sounds/Ping.aiff")) {
+    return;
+  }
+  const sep = text.trim().length > 0 ? "\n\n" : "";
+  await fs.mkdir(agentDir, { recursive: true });
+  await fs.writeFile(file, `${text.trimEnd()}${sep}${snippet}\n`, "utf8");
 }

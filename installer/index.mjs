@@ -9,7 +9,7 @@ import { configureFallbacks } from "./fallbacks.mjs";
 import { configurePackagesAndKeys } from "./packages.mjs";
 import { mergeCredentials, readAuth } from "./auth-store.mjs";
 import { applySettings } from "./settings.mjs";
-import { configureExtras } from "./extras.mjs";
+import { applyEnabledExtras, configureExtras } from "./extras.mjs";
 import { doctor } from "./doctor.mjs";
 import { loadAnswers as loadAnswersFile } from "./answers.mjs";
 import { bindAgentDir } from "./pi-runtime.mjs";
@@ -180,7 +180,9 @@ export async function setup(rawOptions) {
       break;
     }
     case "extras": {
-      await configureExtras(options);
+      const { enabledExtras } = await configureExtras(options);
+      if (!options.dryRun) await applyEnabledExtras(options.agentDir, enabledExtras);
+      log(options, `macOS extras enabled: ${enabledExtras.length ? enabledExtras.join(", ") : "(none)"}`);
       break;
     }
   }

@@ -43,7 +43,7 @@ ultimate-pi setup extras
 
 ## `tmux` is missing (subagents will not spawn)
 
-**Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester each need their own tmux pane. Without `tmux`, the five-role team cannot launch (Windows needs WSL; native Windows is not supported).
+**Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester/video-ads each need their own tmux pane. Without `tmux`, the six-role team cannot launch (Windows needs WSL; native Windows is not supported).
 
 **Fix**
 
@@ -129,14 +129,14 @@ An empty-looking chain usually means setup fallbacks was skipped, `--yes` left d
 |---|---|
 | `ultimate-pi install` | Full walkthrough (preflight → providers → agents → fallbacks → JEV → memory → extras → apply → doctor) |
 | `ultimate-pi setup providers` | Select providers and capture OAuth/keys |
-| `ultimate-pi setup agents` | Assign models to scout/worker/planner/researcher/qa_tester |
+| `ultimate-pi setup agents` | Assign models to scout/worker/planner/researcher/qa_tester/video-ads |
 | `ultimate-pi setup fallbacks` | Per-provider 429 chains and per-agent overrides |
 | `ultimate-pi setup jev` | OpenRouter key for live JEV (else heuristic) |
 | `ultimate-pi setup memory` | Optional DeepSeek key / observational memory |
 | `ultimate-pi setup extras` | macOS-only conveniences (iTerm2 status line, completion beep); a no-op on other platforms. Optional packages are installed during install / JEV / memory setup, not here. |
 | `ultimate-pi doctor` | Self-check only |
 | `ultimate-pi uninstall` | Removes the managed AGENTS.md block, marked agent profiles, and the Ultimate Pi self package. Does **not** delete `auth.json`, `model-agents.json`, third-party packages, or backups. |
-| `ultimate-pi uninstall --full` / `--purge` | Also removes `model-agents.json` and third-party packages Ultimate Pi installed (pi-lens, pi-graft, pi-interactive-subagents, plannotator, pi-cache-graph, and related). Never deletes `auth.json`. Prints remaining backup paths so you can delete them manually. |
+| `ultimate-pi uninstall --full` / `--purge` | Also removes `model-agents.json` and third-party packages Ultimate Pi installed (pi-lens, pi-graft, `@spences10/pi-themes`, pi-interactive-subagents, plannotator, pi-cache-graph, and related). Never deletes `auth.json`. Prints remaining backup paths so you can delete them manually. |
 
 Writes to existing files take a timestamped backup first. API keys are never printed.
 

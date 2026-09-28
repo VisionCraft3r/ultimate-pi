@@ -26,7 +26,7 @@ const AGENTS_MD_PATH = join(AGENT_DIR, "AGENTS.md");
 export const AGENTS_MD_BEGIN_MARKER = "<!-- ultimate-pi:begin -->";
 export const AGENTS_MD_END_MARKER = "<!-- ultimate-pi:end -->";
 
-export const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester"] as const;
+export const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester", "video-ads"] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
 
 /** Default provider ordering used only when no chain is configured. Caller supplies real defaults via deriveDefaultChains(). */

@@ -42,6 +42,7 @@ These remain `peerDependencies`. This package does not vendor them.
 - [pi-lens](https://www.npmjs.com/package/pi-lens) — Apostolos Mantzaris, MIT.
 - [pi-cache-graph](https://www.npmjs.com/package/pi-cache-graph) — Arnav Gupta, MIT.
 - [pi-graft](https://www.npmjs.com/package/pi-graft) — KSonny4, MIT.
+- [@spences10/pi-themes](https://www.npmjs.com/package/@spences10/pi-themes) — Scott Spence, MIT. Supplies the default `neon-noir` theme.
 
 ---
 
@@ -113,7 +114,7 @@ Opt-in macOS extra, genericized from a local iTerm2 status helper. Binary path: 
 
 ### `extras/macos/completion-beep.md`
 
-Opt-in AGENTS.md snippet documenting `afplay /System/Library/Sounds/Ping.aiff`. macOS-only; not part of the default extension set.
+macOS AGENTS.md snippet documenting `afplay /System/Library/Sounds/Ping.aiff`. On darwin, install appends it outside the managed markers by default. Not part of the extension set, and not applied off macOS.
 
 ---
 

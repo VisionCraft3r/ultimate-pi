@@ -17,6 +17,7 @@ const REQUIRED_PACKAGES = [
   "git:github.com/amosblomqvist/pi-interactive-subagents@c3e8b53c0754ae5ccc19fdab5a7481ec039bc2f7",
   "npm:pi-lens",
   "npm:pi-graft",
+  "npm:@spences10/pi-themes",
 ];
 
 function isCancelled(value) {

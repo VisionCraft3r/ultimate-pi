@@ -14,6 +14,7 @@ export const ULTIMATE_PI_THIRD_PARTY_PREFIXES = [
   "git:github.com/amosblomqvist/pi-observational-memory",
   "npm:pi-lens",
   "npm:pi-graft",
+  "npm:@spences10/pi-themes",
   "npm:@plannotator/pi-extension",
   "npm:pi-cache-graph",
   "npm:@gotgenes/pi-anthropic-auth",

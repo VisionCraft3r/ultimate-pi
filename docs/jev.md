@@ -26,9 +26,9 @@ Docs: [TypeSafe AI](https://typesafe.ai/), [TypeSafe docs](https://docs.typesafe
 | Tier | Meaning | Routes to |
 |---|---|---|
 | `tier_0` | Answer directly; no subagent | Orchestrator / main session |
-| `tier_1` | A single, obviously local fix | One `worker` |
-| `tier_2` | Needs a location scout first | `scout`, then `worker` |
-| `tier_3` | New subsystem or architecture | `planner` → spec-ready review → `worker`s |
+| `tier_1` | A single, obviously local fix | One `worker` (or `video-ads` for a video-ad leaf) |
+| `tier_2` | Needs a location scout first | `scout`, then `worker` (or `video-ads`) |
+| `tier_3` | New subsystem or architecture | `planner` → spec-ready review → `worker`s (or `video-ads` leaves) |
 | `tier_4_qa` | Needs a live browser/UI | `qa_tester` |
 
 `researcher` is not a JEV tier. The orchestrator spawns it when external docs or web research are needed.

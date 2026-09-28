@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts";
 import { canonicalizeAnswersFields } from "./schema.mjs";
 
-const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester"];
+const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester", "video-ads"];
 const SESSIONS = ["main", ...AGENT_NAMES];
 
 const DEFAULT_ORDER = [

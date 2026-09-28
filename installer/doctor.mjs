@@ -122,6 +122,9 @@ function physicallyInstalled(agentDir, kind, matchedSources) {
   }
   if (kind === "npm:pi-lens") return existsSync(path.join(agentDir, "npm", "node_modules", "pi-lens"));
   if (kind === "npm:pi-graft") return existsSync(path.join(agentDir, "npm", "node_modules", "pi-graft"));
+  if (kind === "npm:@spences10/pi-themes") {
+    return existsSync(path.join(agentDir, "npm", "node_modules", "@spences10", "pi-themes"));
+  }
   return false;
 }
 
@@ -135,6 +138,7 @@ async function checkRequiredPackages(agentDir, options = {}) {
     { id: "git:github.com/amosblomqvist/pi-interactive-subagents", match: (spec) => gitRepo(spec) === SUBAGENTS_GIT_REPO },
     { id: "npm:pi-lens", match: (spec) => npmPackageName(spec) === "pi-lens" },
     { id: "npm:pi-graft", match: (spec) => npmPackageName(spec) === "pi-graft" },
+    { id: "npm:@spences10/pi-themes", match: (spec) => npmPackageName(spec) === "@spences10/pi-themes" },
   ];
 
   const missingSettings = [];
@@ -160,7 +164,7 @@ async function checkRequiredPackages(agentDir, options = {}) {
   const ok = problems.length === 0;
   const detail = ok
     ? options.offline
-      ? "settings.json lists self, interactive-subagents, npm:pi-lens, npm:pi-graft"
+      ? "settings.json lists self, interactive-subagents, npm:pi-lens, npm:pi-graft, npm:@spences10/pi-themes"
       : "required packages present in settings.json and installed"
     : problems.join("; ");
   return mark(ok, "required packages", detail);
