@@ -8,6 +8,7 @@ import { assignAgentModels } from "./agents.mjs";
 import { configureFallbacks } from "./fallbacks.mjs";
 import { configurePackagesAndKeys } from "./packages.mjs";
 import { mergeCredentials, readAuth } from "./auth-store.mjs";
+import { mergeModelsJson } from "./models-json.mjs";
 import { applySettings } from "./settings.mjs";
 import { applyEnabledExtras, configureExtras } from "./extras.mjs";
 import { doctor } from "./doctor.mjs";
@@ -50,7 +51,7 @@ async function welcome(options) {
   }
   log(
     options,
-    `Will configure agent dir: ${options.agentDir}\nWrites: auth.json, settings.json, agents/, AGENTS.md, model-agents.json (timestamped backups first).`,
+    `Will configure agent dir: ${options.agentDir}\nWrites: auth.json, models.json, settings.json, agents/, AGENTS.md, model-agents.json (timestamped backups first).`,
   );
 }
 
@@ -85,7 +86,9 @@ export async function install(rawOptions) {
   const deepseekKey = keys.find((k) => k.id === "deepseek")?.credential;
 
   if (!options.dryRun) {
+    const backupSession = options.backupSession ?? createBackupSession(options.agentDir);
     await mergeCredentials(options.agentDir, allProviders);
+    await mergeModelsJson(options.agentDir, providers, backupSession);
   }
 
   const allAnswers = {
@@ -129,8 +132,14 @@ export async function setup(rawOptions) {
   const { providers } = await collectProviders(options);
 
   switch (options.setupTopic) {
-    case "providers":
-      break; // collectProviders() above already did the work
+    case "providers": {
+      if (!options.dryRun) {
+        const backupSession = options.backupSession ?? createBackupSession(options.agentDir);
+        await mergeCredentials(options.agentDir, providers);
+        await mergeModelsJson(options.agentDir, providers, backupSession);
+      }
+      break;
+    }
     case "agents": {
       const installed = await loadInstalledState(options.agentDir);
       const agentAssignments = await assignAgentModels(options, providers);

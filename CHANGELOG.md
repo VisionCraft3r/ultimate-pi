@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Preference defaults** applied only when unset: `neon-noir` theme, visible thinking, compaction, and graft hit/char limits. Observational memory starts enabled when it is installed. `npm:@spences10/pi-themes` is now required.
 - **macOS completion beep** is the default extra on darwin (`--yes` and the preselected prompt). The snippet is appended outside the managed markers and is not duplicated. iTerm2 status stays opt-in.
 - Docs: [docs/extensions.md](./docs/extensions.md) and [docs/improvements.md](./docs/improvements.md)
+- **Local model** provider choice: base URL, model ids, and an optional API key are written to `models.json` plus `auth.json` during install and `setup providers`. The model ids are offered when assigning agents. `--yes` does not invent a local server.
 
 ### Security
 

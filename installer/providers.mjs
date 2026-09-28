@@ -1,5 +1,11 @@
 import * as p from "@clack/prompts";
 
+const LOCAL_CHOICE = "__local__";
+const LOCAL_PLACEHOLDER_KEY = "local";
+const DEFAULT_LOCAL_API = "openai-completions";
+const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434/v1";
+const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+
 const PROVIDER_CHOICES = [
   { value: "anthropic", label: "Anthropic (OAuth /login)" },
   { value: "openai-codex", label: "OpenAI Codex (OAuth /login)" },
@@ -8,7 +14,12 @@ const PROVIDER_CHOICES = [
   { value: "deepseek", label: "DeepSeek (API key)" },
   { value: "openai", label: "OpenAI (API key)" },
   { value: "other", label: "Other (API key)" },
+  { value: LOCAL_CHOICE, label: "Local model (OpenAI-compatible)" },
 ];
+
+const RESERVED_PROVIDER_IDS = new Set(
+  PROVIDER_CHOICES.map((choice) => choice.value).filter((value) => value !== LOCAL_CHOICE),
+);
 
 const OAUTH_PROVIDERS = new Set(["anthropic", "openai-codex", "cursor"]);
 const API_KEY_PROVIDERS = new Set(["openrouter", "deepseek", "openai", "other"]);
@@ -34,10 +45,81 @@ function normalizeAuthMethod(raw, id) {
   return authMethodFor(id);
 }
 
+function modelIdsFromEntry(entry) {
+  if (!entry || typeof entry !== "object") return [];
+  if (Array.isArray(entry.models)) {
+    return entry.models
+      .map((model) => {
+        if (typeof model === "string") return model.trim();
+        if (model && typeof model.id === "string") return model.id.trim();
+        return "";
+      })
+      .filter(Boolean);
+  }
+  if (typeof entry.model === "string" && entry.model.trim()) return [entry.model.trim()];
+  return [];
+}
+
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A provider entry is a local endpoint when it carries a base URL, an API
+ * name, or a model list. `model` (string) is a one-element `models` list.
+ * Missing credentials become the placeholder `local`.
+ */
+export function normalizeLocalProvider(entry) {
+  if (!entry || typeof entry !== "object") return undefined;
+  const baseUrl = typeof entry.baseUrl === "string" ? entry.baseUrl.trim() : "";
+  const models = modelIdsFromEntry(entry);
+  const api = typeof entry.api === "string" ? entry.api.trim() : "";
+  if (!baseUrl && !api && models.length === 0) return undefined;
+
+  const id = typeof entry.id === "string" ? entry.id.trim() : "";
+  if (!PROVIDER_ID_PATTERN.test(id)) {
+    throw new Error(
+      `local provider id "${id}" must match ${PROVIDER_ID_PATTERN} (lowercase slug)`,
+    );
+  }
+  if (RESERVED_PROVIDER_IDS.has(id)) {
+    throw new Error(
+      `provider id "${id}" is reserved for a built-in provider and cannot be used as a local endpoint`,
+    );
+  }
+  if (!isHttpUrl(baseUrl)) {
+    throw new Error(`local provider "${id}" needs an http(s) baseUrl`);
+  }
+  if (models.length === 0) {
+    throw new Error(`local provider "${id}" needs at least one model id`);
+  }
+  const credential =
+    typeof entry.credential === "string" && entry.credential.trim()
+      ? entry.credential.trim()
+      : LOCAL_PLACEHOLDER_KEY;
+  return {
+    id,
+    authMethod: "api-key",
+    baseUrl,
+    api: api || DEFAULT_LOCAL_API,
+    models,
+    credential,
+  };
+}
+
 function providersFromAnswers(answers) {
   const list = answers?.providers;
   if (!Array.isArray(list) || list.length === 0) return null;
   return list.map((entry) => {
+    if (typeof entry !== "string") {
+      const local = normalizeLocalProvider(entry);
+      if (local) return local;
+    }
     const id = typeof entry === "string" ? entry : entry.id;
     const rawMethod = typeof entry === "string" ? undefined : entry.authMethod;
     const authMethod = normalizeAuthMethod(rawMethod, id);
@@ -133,6 +215,87 @@ async function promptOAuth(id) {
   );
 }
 
+async function promptProviderId(selected) {
+  const id = isCancelled(
+    await p.text({
+      message: "Provider id",
+      placeholder: "local",
+      initialValue: "local",
+      validate: (value) => {
+        const slug = value?.trim() ?? "";
+        if (!PROVIDER_ID_PATTERN.test(slug)) return "Use a lowercase slug: letters, numbers, _ or -";
+        if (RESERVED_PROVIDER_IDS.has(slug)) return `${slug} is a built-in provider`;
+        if (selected.has(slug)) return `${slug} is already configured`;
+        return undefined;
+      },
+    }),
+  );
+  return id.trim();
+}
+
+async function promptModelIds() {
+  const models = [];
+  const first = isCancelled(
+    await p.text({
+      message: "Model id served by this endpoint",
+      placeholder: "qwen2.5-coder:7b",
+      validate: (value) => (value?.trim() ? undefined : "Model id is required"),
+    }),
+  );
+  models.push(first.trim());
+  while (true) {
+    const another = isCancelled(
+      await p.confirm({
+        message: "Add another model on this endpoint?",
+        initialValue: false,
+      }),
+    );
+    if (!another) break;
+    const next = isCancelled(
+      await p.text({
+        message: "Additional model id",
+        validate: (value) => (value?.trim() ? undefined : "Model id is required"),
+      }),
+    );
+    const id = next.trim();
+    if (!models.includes(id)) models.push(id);
+  }
+  return models;
+}
+
+async function collectLocal(options, selected) {
+  const id = await promptProviderId(selected);
+  const baseUrlInput = isCancelled(
+    await p.text({
+      message: "Base URL",
+      initialValue: DEFAULT_LOCAL_BASE_URL,
+      placeholder: DEFAULT_LOCAL_BASE_URL,
+      validate: (value) =>
+        isHttpUrl(value?.trim() ?? "") ? undefined : "Base URL must start with http:// or https://",
+    }),
+  );
+  const models = await promptModelIds();
+  let credential = LOCAL_PLACEHOLDER_KEY;
+  if (!options.dryRun) {
+    const key = isCancelled(
+      await p.password({
+        message: `API key for ${id} (empty uses placeholder "${LOCAL_PLACEHOLDER_KEY}")`,
+        mask: "•",
+      }),
+    );
+    if (key?.trim()) credential = key.trim();
+  }
+  selected.add(id);
+  return {
+    id,
+    authMethod: "api-key",
+    baseUrl: baseUrlInput.trim(),
+    api: DEFAULT_LOCAL_API,
+    models,
+    credential,
+  };
+}
+
 async function collectOne(id, options) {
   const authMethod = authMethodFor(id);
   const result = { id, authMethod };
@@ -181,6 +344,10 @@ export async function collectProviders(options = {}) {
   );
 
   for (const id of initial) {
+    if (id === LOCAL_CHOICE) {
+      providers.push(await collectLocal(options, selected));
+      continue;
+    }
     selected.add(id);
     providers.push(await collectOne(id, options));
   }
@@ -194,7 +361,9 @@ export async function collectProviders(options = {}) {
     );
     if (!addAnother) break;
 
-    const remaining = PROVIDER_CHOICES.filter((c) => !selected.has(c.value));
+    const remaining = PROVIDER_CHOICES.filter(
+      (choice) => choice.value === LOCAL_CHOICE || !selected.has(choice.value),
+    );
     if (remaining.length === 0) {
       p.log.info("All known providers are already selected.");
       break;
@@ -206,6 +375,10 @@ export async function collectProviders(options = {}) {
         options: remaining,
       }),
     );
+    if (next === LOCAL_CHOICE) {
+      providers.push(await collectLocal(options, selected));
+      continue;
+    }
     selected.add(next);
     providers.push(await collectOne(next, options));
   }

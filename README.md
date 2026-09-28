@@ -156,7 +156,8 @@ echoed, logged, or passed on the command line.
 | `openrouter` | API key | also used for JEV |
 | `deepseek` | API key | also used for observational memory |
 | `openai` | API key | |
-| `other` | API key | any OpenAI-compatible provider id |
+| `other` | API key | a Pi provider id plus a key; no base URL |
+| local endpoint | optional API key | OpenAI-compatible server in `models.json` (Ollama, LM Studio, vLLM). llama.cpp `/llama` stays a Pi command |
 
 See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 
