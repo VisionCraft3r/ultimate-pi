@@ -8,7 +8,7 @@ import { join } from "node:path";
 const scratch = mkdtempSync(join(tmpdir(), "upi-fallback-"));
 process.env.PI_CODING_AGENT_DIR = scratch;
 
-const { resolveFallbackChain } = await import("../lib/model-agents.ts");
+const { resolveFallbackChain, resolveScopedSwitchChain } = await import("../lib/model-agents.ts");
 const { deriveDefaultChains } = await import("../lib/quota-fallback.ts");
 
 const ASSIGNMENTS = join(scratch, "model-agents.json");
@@ -67,6 +67,24 @@ test("returns [] when nothing matches", () => {
 	});
 	assert.deepEqual(resolveFallbackChain("anthropic", {}, "worker"), []);
 	assert.deepEqual(resolveFallbackChain("unknown", DEFAULTS), []);
+});
+
+test("scoped switch ignores derived defaults and models outside the scope", () => {
+	writeAssignments({
+		fallbacks: {
+			anthropic: [
+				{ provider: "cursor", id: "cursor-grok-4.6-medium" },
+				{ provider: "openai", id: "not-scoped" },
+			],
+		},
+	});
+	const scoped = ["cursor/cursor-grok-4.6-medium", "anthropic/claude-sonnet-5"];
+	assert.deepEqual(resolveScopedSwitchChain("anthropic", DEFAULTS, "worker", scoped), [
+		{ provider: "cursor", id: "cursor-grok-4.6-medium" },
+	]);
+	writeAssignments({});
+	assert.deepEqual(resolveScopedSwitchChain("anthropic", DEFAULTS, "worker", []), DEFAULT_CHAIN);
+	assert.deepEqual(resolveScopedSwitchChain("anthropic", DEFAULTS, "worker", scoped), []);
 });
 
 test("deriveDefaultChains produces a chain that excludes the provider itself", () => {

@@ -5,7 +5,9 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { getOtherLabel, normalizeOptions, type AskOption } from "./question-helpers.ts";
+import { fileURLToPath } from "node:url";
+import { writeAskSidecar } from "../lib/planner-handoff.ts";
+import { formatSidecarQuestion, getOtherLabel, normalizeOptions, type AskOption } from "../lib/question-helpers.ts";
 
 export { getOtherLabel, normalizeOptions };
 
@@ -41,6 +43,7 @@ type Details = {
 };
 
 const DONE = "Done";
+const SUBAGENT_WAIT_TEXT = "Question sent to the orchestrator. Stop here and wait — do not continue working or assume an answer. Their reply will arrive as your next message.";
 
 function reply(text: string, details: Details) {
 	return { content: [{ type: "text" as const, text }], details };
@@ -119,7 +122,23 @@ async function askMulti(
 	return reply(text, { ...base, answer, wasCustom: answer.some((v) => !options.some((o) => o.value === v)) });
 }
 
+const THIS_FILE = fileURLToPath(import.meta.url);
+
+function registerForSubagents(name: string, extensionPath: string): void {
+	const register = (globalThis as { __pi_interactive_subagents?: { registerToolExtension?: (name: string, path: string) => void } }).__pi_interactive_subagents?.registerToolExtension;
+	if (typeof register !== "function") return;
+	try {
+		register(name, extensionPath);
+	} catch {
+		// already bound to this path
+	}
+}
+
 export default function askUserQuestion(pi: ExtensionAPI) {
+	registerForSubagents("ask_user_question", THIS_FILE);
+	pi.on("session_start", () => {
+		registerForSubagents("ask_user_question", THIS_FILE);
+	});
 	pi.registerTool({
 		name: "ask_user_question",
 		label: "Ask User",
@@ -136,6 +155,21 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				multiSelect,
 				options: options.map((o) => o.label),
 			};
+			if (process.env.PI_SUBAGENT_SESSION?.trim()) {
+				const parked = writeAskSidecar(formatSidecarQuestion({
+					question: params.question,
+					details: params.details,
+					options,
+					multiSelect,
+				}));
+				if (!parked) {
+					return reply(
+						"A question is already waiting for the orchestrator. Stop and wait for the reply.",
+						{ ...base, answer: null },
+					);
+				}
+				return reply(SUBAGENT_WAIT_TEXT, { ...base, answer: null });
+			}
 			if (!ctx.hasUI) {
 				return reply(
 					"Error: cannot ask the user without an interactive UI (headless or non-interactive mode).",

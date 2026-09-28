@@ -60,3 +60,25 @@ export function promptOptions(mode: QuestionMode, options?: RawOption[] | null):
 	if (mode === "text") return [];
 	return optionsWithOther(normalizeOptions(options));
 }
+
+/** Question text parked in a subagent `.ask` sidecar for the parent session. */
+export function formatSidecarQuestion(input: {
+	question: string;
+	details?: string;
+	options?: Array<{ label: string; description?: string }>;
+	multiSelect?: boolean;
+}): string {
+	const lines = [input.question.trim()];
+	const details = input.details?.trim();
+	if (details) lines.push("", details);
+	const options = (input.options ?? []).filter((option) => option.label.trim());
+	if (options.length > 0) {
+		lines.push("", input.multiSelect ? "Select any:" : "Options:");
+		for (const option of options) {
+			const hint = option.description?.trim() ? ` — ${option.description.trim()}` : "";
+			lines.push(`- ${option.label.trim()}${hint}`);
+		}
+		lines.push("- Other");
+	}
+	return lines.join("\n");
+}

@@ -18,7 +18,7 @@ Safety and state check for `worker`, `qa_tester`, and `video-ads` before destruc
 
 ### `quota-fallback`
 
-On HTTP 429, switches the current turn to the next hop in `model-agents.json` (per-agent override, then per-provider chain, then a derived default from configured providers). The switch lasts for the session and does not rewrite the agent's saved model. If every hop 429s, the error is reported.
+On HTTP 429, switches the current turn to the next hop in `model-agents.json` (per-agent override, then per-provider chain, then a derived default from configured providers). When `settings.json` `enabledModels` or the session scoped-model list is non-empty, the derived default is skipped and a written hop is used only if that `provider/id` is in the list. The switch lasts for the session and does not rewrite the agent's saved model. If every hop 429s, the error is reported.
 
 Does not embed a fixed list of model ids.
 
@@ -28,7 +28,7 @@ Does not embed a fixed list of model ids.
 
 ### `planner-handoff`
 
-Gives the planner `handoff_spec` plus a silent-park `.ask` watchdog so a spec-ready plan becomes a `subagent_question` even if the planner only printed a park line. The parent session reviews that question; the planner does not spawn workers itself.
+Gives the planner `handoff_spec` plus a silent-park `.ask` watchdog so a spec-ready plan becomes a `subagent_question` even if the planner only printed a park line. `handoff_spec` opens the spec in the Plannotator browser and waits for approval before writing the sidecar. `UNATTENDED_MODE=true` skips the browser. If Plannotator is not installed under the agent dir, the tool returns that error and does not send the handoff. The parent session reviews the question; the planner does not spawn workers itself.
 
 ### `bash-guard`
 
@@ -38,19 +38,11 @@ Does not allow a child to work around a block.
 
 ### `ask-user-question`
 
-`ask_user_question` for free text, single-select, and multi-select with an always-present Other field. Forwards questions to the Paperclip sidecar when that environment is set, and parks subagents until the parent answers.
-
-### `paperclip-mirror`
-
-When Paperclip env is set, mirrors tmux subagent launches and closes as board child tasks.
-
-### `paperclip-subagent-hold`
-
-Holds a `--print` run open until spawned subagents finish, so a Paperclip job does not exit while panes are still working.
+`ask_user_question` for free text, single-select, and multi-select with an always-present Other field. In a child session (`PI_SUBAGENT_SESSION`) it writes the question to the `.ask` sidecar and tells the child to stop and wait. The main session uses Pi's select and input dialogs. The option helpers live in `lib/question-helpers.ts`. Pi loads every top-level `extensions/*.ts` file as an extension, so a helper left there stops Pi from starting.
 
 ### `launch-update`
 
-On session start, checks whether a local Ultimate Pi checkout is newer than the installed tree and copies `extensions`, `lib`, `templates`, `skills`, and `patches` only after that checkout's tests pass. Override the checkout with `ULTIMATE_PI_ROOT`.
+On session start, applies patch and minor npm updates that stay on known pins. Major bumps, and packages pinned to a patch (`@schultzp2020/pi-cursor`), are left in place. It also copies `extensions`, `lib`, `templates`, `skills`, and `patches` from a checkout named by `ULTIMATE_PI_ROOT` only after that checkout's tests pass. Extension files that do not export a factory are not copied. The extension does not assume a home-directory path.
 
 ## Browser, web, and prompts
 

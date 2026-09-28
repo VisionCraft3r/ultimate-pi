@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **macOS completion beep** is the default extra on darwin (`--yes` and the preselected prompt). The snippet is appended outside the managed markers and is not duplicated. iTerm2 status stays opt-in.
 - Docs: [docs/extensions.md](./docs/extensions.md) and [docs/improvements.md](./docs/improvements.md)
 - **Local model** provider choice: base URL, model ids, and an optional API key are written to `models.json` plus `auth.json` during install and `setup providers`. The model ids are offered when assigning agents. `--yes` does not invent a local server.
+- **Scoped 429 fallback.** When `enabledModels` or the session's scoped model list is non-empty, a quota switch uses only hops written in `model-agents.json` that are also in that list. An empty list still uses the derived default chain.
+- **Plannotator on `handoff_spec`.** The planner opens the spec in the browser and waits for approval before the `.ask` sidecar is written. `UNATTENDED_MODE=true` skips the browser. A missing Plannotator install returns the reason instead of pretending the spec was sent.
+- **`ask_user_question` in child sessions** parks the question in the `.ask` sidecar and tells the child to wait. Option helpers live in `lib/`, not `extensions/`, so Pi does not try to load them as extensions.
+- **`launch-update`** on session start applies patch and minor npm updates that stay on known pins, and copies a newer checkout into the agent dir only after that checkout's tests pass. Point it at a checkout with `ULTIMATE_PI_ROOT`. Major bumps stay put.
+- **`qa_tester`** profile sets `thinking: medium`.
 
 ### Security
 

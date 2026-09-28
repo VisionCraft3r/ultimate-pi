@@ -86,7 +86,7 @@ Everything else stays off unless the profile named it. That is the allowlisting 
 
 1. **`agentFallbacks[<agent>]`** — per-role override. The orchestrator is keyed as `main`.
 2. **`fallbacks[<provider>]`** — global per-provider chain.
-3. **Derived default** — a chain built from the providers that are actually configured.
+3. **Derived default** — a chain built from the providers that are actually configured. Skipped when `enabledModels` or the session scoped-model list is non-empty. In that case a written hop is used only if its `provider/id` is in the list.
 4. **None** — no fallback; the miss is logged once and the error surfaces.
 
 Example shape:
@@ -112,7 +112,7 @@ On a 429 for a `worker` using Anthropic, that file would try `agentFallbacks.wor
 
 1. `jev_triage` routes the request to `planner`.
 2. The planner works in its own tmux pane and, when the breakdown is ready, calls the **`handoff_spec`** tool instead of starting implementation itself.
-3. `handoff_spec` parks the planner with a **`.ask` silent-park watchdog**: the pane stays alive but does not keep generating, so the spec cannot be overwritten while the orchestrator reads it.
+3. `handoff_spec` opens the spec in the Plannotator browser and waits for approval, then parks the planner with a **`.ask` silent-park watchdog**: the pane stays alive but does not keep generating, so the spec cannot be overwritten while the orchestrator reads it. `UNATTENDED_MODE=true` skips the browser.
 4. The orchestrator reviews the spec ("spec-ready"). If it is incomplete, the planner is resumed. If it is ready, the orchestrator fans out one or more `worker` panes against that spec.
 
 Workers never see a half-written plan. The watchdog is what keeps the planner from talking over the review.

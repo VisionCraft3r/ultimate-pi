@@ -16,6 +16,10 @@
  *      ordering among whatever providers the user actually configured)
  *   4. empty chain — no fallback available, surfaced to the user as an error
  *
+ * When settings.json enabledModels or the session scoped-model list is
+ * non-empty, step 3 is skipped and a file chain entry is used only when that
+ * provider/id is in the scoped list.
+ *
  * Schema note (back-compat): the OLD schema only had a flat
  * `fallbacks[provider] -> ModelRef[]` map (see the pre-1.0 FALLBACK_BY_PROVIDER
  * constant, now removed). The NEW schema adds `agentFallbacks[agentOrMain]`
@@ -26,7 +30,7 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
-import { resolveFallbackChain, type ModelRef } from "./model-agents.ts";
+import { readEnabledModels, resolveScopedSwitchChain, type ModelRef } from "./model-agents.ts";
 
 /** Appended so Pi's isRetryableAssistantError returns false (quota exceeded + cancelled). */
 const QUOTA_CANCEL_SUFFIX = "\ncancelled: quota exceeded";
@@ -182,7 +186,11 @@ async function switchAwayFrom(
   }
 
   const agentName = currentAgentName(ctx);
-  const chain = resolveFallbackChain(deadProvider, derivedDefaults, agentName);
+  const sessionScoped = (ctx.scopedModels ?? []).map((scoped) => `${scoped.model.provider}/${scoped.model.id}`);
+  const chain = resolveScopedSwitchChain(deadProvider, derivedDefaults, agentName, [
+    ...readEnabledModels(),
+    ...sessionScoped,
+  ]);
   switching = true;
   const failures: string[] = [];
   try {

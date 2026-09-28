@@ -2,6 +2,7 @@
 name: qa_tester
 description: UI and end-to-end QA tester
 model: {{model}}
+thinking: medium
 auto-exit: true
 system-prompt: append
 tools: jev_sentinel, browser_goto, browser_click, browser_eval, browser_fill, browser_screenshot, browser_console, browser_network

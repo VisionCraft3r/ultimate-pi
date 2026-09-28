@@ -314,19 +314,43 @@ function validChain(chain: unknown): ModelRef[] | undefined {
  *   3. defaults[provider]         — derived defaults passed in by the caller
  *   4. []                         — no fallback available
  */
-export function resolveFallbackChain(
-  provider: string,
-  defaults: Record<string, ModelRef[]>,
-  agentName?: string,
-): ModelRef[] {
+/** Chain stored in model-agents.json only. Undefined when the file has no entry. */
+export function readFileFallbackChain(provider: string, agentName?: string): ModelRef[] | undefined {
   const assignments = readAssignments();
   if (agentName) {
     const agentChain = validChain(assignments.agentFallbacks?.[agentName]);
     if (agentChain) return agentChain;
   }
-  const chain = validChain(assignments.fallbacks?.[provider]);
-  if (chain) return chain;
-  return defaults[provider] ?? [];
+  return validChain(assignments.fallbacks?.[provider]);
+}
+
+export function resolveFallbackChain(
+  provider: string,
+  defaults: Record<string, ModelRef[]>,
+  agentName?: string,
+): ModelRef[] {
+  return readFileFallbackChain(provider, agentName) ?? defaults[provider] ?? [];
+}
+
+export function filterChainToScope(chain: ModelRef[], scopedRefs: readonly string[]): ModelRef[] {
+  if (scopedRefs.length === 0) return chain;
+  const allowed = new Set(scopedRefs.map((ref) => ref.toLowerCase()));
+  return chain.filter((spec) => allowed.has(`${spec.provider}/${spec.id}`.toLowerCase()));
+}
+
+/**
+ * When a scoped model list is set, 429 switches may only use a chain that is
+ * both written in model-agents.json and present in that list. An empty scope
+ * keeps the historical derived-default chain.
+ */
+export function resolveScopedSwitchChain(
+  provider: string,
+  defaults: Record<string, ModelRef[]>,
+  agentName: string | undefined,
+  scopedRefs: readonly string[],
+): ModelRef[] {
+  if (scopedRefs.length === 0) return resolveFallbackChain(provider, defaults, agentName);
+  return filterChainToScope(readFileFallbackChain(provider, agentName) ?? [], scopedRefs);
 }
 
 export function writeFallbackChain(provider: string, chain: ModelRef[]): void {

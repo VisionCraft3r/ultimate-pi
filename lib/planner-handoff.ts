@@ -7,8 +7,11 @@
  */
 
 import { existsSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { reviewPlanInBrowser } from "./plan-review.ts";
 
 const PARK_TEXT =
   /parked for review|decision-complete|## Open Questions|no workers (were )?dispatched/i;
@@ -101,7 +104,7 @@ export function synthesizeHandoffQuestion(text: string): string {
     `Verdict: ${verdictLine.slice(0, 240)}`,
     "Approve this spec or send revision notes.",
     "After you approve, fan out workers from the plan leaves (cap 3). Do not tell this planner to spawn workers.",
-    "This pane does not load a plan-review UI; a park line is not a handoff.",
+    "Call handoff_spec so Plannotator opens this file in the browser.",
   ].join("\n");
 }
 
@@ -131,7 +134,8 @@ export function installPlannerHandoff(pi: ExtensionAPI): void {
         "Call handoff_spec once the spec is written — that is the only spec-ready handoff to the parent.",
       promptGuidelines: [
         "Last action of the park turn must be handoff_spec, not a text-only park line.",
-        "Product questions still use ask_question, one at a time.",
+        "handoff_spec opens the plan in the Plannotator browser and waits for approval.",
+        "Product questions still use ask_user_question, one at a time.",
       ],
       parameters: Type.Object({
         path: Type.String({ description: "Spec path, e.g. .pi/plans/slug.md" }),
@@ -145,7 +149,7 @@ export function installPlannerHandoff(pi: ExtensionAPI): void {
           }),
         ),
       }),
-      async execute(_toolCallId, params) {
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         const file = sessionFile();
         if (!file) {
           return {
@@ -158,6 +162,26 @@ export function installPlannerHandoff(pi: ExtensionAPI): void {
             details: { error: "not-subagent" as string | undefined, question: undefined as string | undefined },
           };
         }
+        const cwd = typeof ctx?.cwd === "string" ? ctx.cwd : process.cwd();
+        const planPath = isAbsolute(params.path) ? params.path : resolve(cwd, params.path);
+        const agentDir = process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
+        if (process.env.UNATTENDED_MODE !== "true") {
+          const review = await reviewPlanInBrowser(planPath, agentDir);
+          if (!review.approved) {
+            const reason = review.feedback?.trim() || review.error || "Plan was not approved.";
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: review.url
+                    ? `Plannotator opened ${review.url}. ${reason} Edit the same file and call handoff_spec again.`
+                    : `${reason} Edit the same file and call handoff_spec again.`,
+                },
+              ],
+              details: { error: reason, question: undefined as string | undefined },
+            };
+          }
+        }
         const question = formatHandoffQuestion(params);
         writeAskSidecar(question);
         fired = true;
@@ -165,8 +189,7 @@ export function installPlannerHandoff(pi: ExtensionAPI): void {
           content: [
             {
               type: "text" as const,
-              text:
-                "Spec handoff sent to the orchestrator. Stop here and wait — do not continue or assume approval. Their reply will arrive as your next message.",
+              text: "Plan approved in Plannotator. Spec handoff sent to the orchestrator. Stop here and wait.",
             },
           ],
           details: { error: undefined as string | undefined, question },

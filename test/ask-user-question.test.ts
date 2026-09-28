@@ -46,6 +46,7 @@ type Execute = (
 function loadExecute(): Execute {
 	let execute: Execute | undefined;
 	register({
+		on() {},
 		registerTool(tool: { execute: Execute }) {
 			execute = tool.execute;
 		},
