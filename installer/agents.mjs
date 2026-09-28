@@ -14,7 +14,6 @@ const PREFERRED_PROVIDER_BY_ROLE = {
   worker: "cursor",
   researcher: "openai-codex",
   planner: "anthropic",
-  "video-ads": "openai-codex",
 };
 
 function isCancelled(value) {

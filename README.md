@@ -23,7 +23,7 @@
 
 Ultimate Pi is a batteries-included configuration and extension pack for the
 [Pi coding agent](https://pi.dev) by Mario Zechner ([earendil-works/pi](https://github.com/earendil-works/pi)).
-It wires up tiered task routing, a six-role subagent team, tool allowlisting,
+It wires up tiered task routing, a five-role subagent team, tool allowlisting,
 cross-provider rate-limit fallback, and a handful of quality-of-life
 extensions (bash safety guard, browser QA tools, web fetch/search, prompt
 snippets, required pi-lens/graft code intelligence, and optional memory/cache)
@@ -37,8 +37,8 @@ third party. See [NOTICE.md](./NOTICE.md) for full attribution.
 
 - **JEV tiered routing** — every request is classified into `tier_0`…`tier_4_qa`
   so cheap/local work stays in the main session and complex work fans out.
-- **Six-role subagent team** — `scout`, `worker`, `planner`, `researcher`,
-  `qa_tester`, and `video-ads`, each with its own tool allowlist and a model
+- **Five-role subagent team** — `scout`, `worker`, `planner`, `researcher`,
+  and `qa_tester`, each with its own tool allowlist and a model
   you assign at install. See [docs/improvements.md](./docs/improvements.md)
   and [docs/extensions.md](./docs/extensions.md).
 - **Tool allowlisting** — subagents launch with `--no-extensions` and an
@@ -132,7 +132,7 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
 2. **Providers** — select and authenticate one or more model providers
    (OAuth via Pi's `/login`, a masked API-key prompt, or a local
    OpenAI-compatible endpoint: base URL and model ids in `models.json`).
-3. **Agent models** — assign a primary model to each of the six agent roles.
+3. **Agent models** — assign a primary model to each of the five agent roles.
 4. **Fallbacks** — configure global per-provider 429 chains and optional
    per-agent overrides.
 5. **JEV** (optional) — an OpenRouter key for tiered routing; skippable, with
@@ -174,7 +174,10 @@ See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 | `planner` | architecture breakdowns; `handoff_spec` opens the spec in Plannotator |
 | `researcher` | web research, external docs |
 | `qa_tester` | drives a live browser/UI |
-| `video-ads` | HyperFrames video ads and promos (replaces `worker` for that leaf only) |
+
+Ultimate Pi does not install a video-ad role. A profile already at
+`agents/video-ads.md` is left in place. The next `ultimate-pi setup agents`
+rewrites the managed routing block and stops assigning that role.
 
 Change assignments any time with `ultimate-pi setup agents` or the in-Pi
 `/ModelAgents` command.
@@ -242,12 +245,10 @@ flowchart LR
     J -->|tier_2| S[scout] --> W
     J -->|tier_3| P[planner] --> W
     J -->|tier_4_qa| Q[qa_tester]
-    O -->|video ad leaf| V[video-ads]
     W --> T[tmux pane]
     S --> T
     P --> T
     Q --> T
-    V --> T
 ```
 
 Subagents launch with `--no-extensions` and an explicit `--tools` allowlist

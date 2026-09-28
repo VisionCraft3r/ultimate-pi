@@ -14,7 +14,7 @@ Does not write code, invent file counts, or choose a model id.
 
 ### `jev-sentinel`
 
-Safety and state check for `worker`, `qa_tester`, and `video-ads` before destructive bash. Registers itself so those children load it under `--no-extensions`, and that load also installs bash-guard's headless hard-block. If Jev is unavailable, a heuristic still blocks catastrophic commands.
+Safety and state check for `worker` and `qa_tester` before destructive bash. Registers itself so those children load it under `--no-extensions`, and that load also installs bash-guard's headless hard-block. If Jev is unavailable, a heuristic still blocks catastrophic commands.
 
 ### `quota-fallback`
 
@@ -24,7 +24,7 @@ Does not embed a fixed list of model ids.
 
 ### `model-agents`
 
-`/ModelAgents` edits the six role models and the 429 chains, and rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md`.
+`/ModelAgents` edits the five role models and the 429 chains, and rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md`.
 
 ### `planner-handoff`
 
@@ -48,7 +48,7 @@ On session start, applies patch and minor npm updates that stay on known pins. M
 
 ### `browser`
 
-`/browser on|off`. Tools: `browser_goto`, `browser_click`, `browser_eval`, `browser_fill`, `browser_screenshot`, `browser_console`, `browser_network`. Used by `qa_tester` and `video-ads` for live pages. Chromium is not bundled; install it with `npx playwright-core install chromium`. The profile lives under the agent dir and is not part of this repository.
+`/browser on|off`. Tools: `browser_goto`, `browser_click`, `browser_eval`, `browser_fill`, `browser_screenshot`, `browser_console`, `browser_network`. Used by `qa_tester` for live pages. Chromium is not bundled; install it with `npx playwright-core install chromium`. The profile lives under the agent dir and is not part of this repository.
 
 ### `web-fetch`
 
@@ -76,5 +76,3 @@ Skills survive `--no-extensions`. They are instructions plus local scripts, not 
 | `pdf-reader` | Text plus rendered pages for PDFs (equations, diagrams) | A local venv with PyMuPDF (`requirements.txt` in the skill) |
 | `web-debug` | Playbooks that force `browser_*` for auth, CORS, storage, blank screens, and prod-only bugs | The browser extension and Chromium |
 | `youtube-transcript` | Title and English captions as JSON | `yt-dlp` and Python 3 |
-
-`video-ads` also expects the external HyperFrames skills (`hyperframes`, `hyperframes-core`, `media-use`, and the other `hyperframes-*` skills) on Pi's normal skill path. Those files are not vendored here. If they are missing, the agent must say so and stop.

@@ -43,7 +43,7 @@ ultimate-pi setup extras
 
 ## `tmux` is missing (subagents will not spawn)
 
-**Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester/video-ads each need their own tmux pane. Without `tmux`, the six-role team cannot launch (Windows needs WSL; native Windows is not supported).
+**Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester each need their own tmux pane. Without `tmux`, the five-role team cannot launch (Windows needs WSL; native Windows is not supported).
 
 **Fix**
 
@@ -129,7 +129,7 @@ An empty-looking chain usually means setup fallbacks was skipped, `--yes` left d
 |---|---|
 | `ultimate-pi install` | Full walkthrough (preflight → providers → agents → fallbacks → JEV → memory → extras → apply → doctor) |
 | `ultimate-pi setup providers` | Select providers and capture OAuth/keys |
-| `ultimate-pi setup agents` | Assign models to scout/worker/planner/researcher/qa_tester/video-ads |
+| `ultimate-pi setup agents` | Assign models to scout/worker/planner/researcher/qa_tester |
 | `ultimate-pi setup fallbacks` | Per-provider 429 chains and per-agent overrides |
 | `ultimate-pi setup jev` | OpenRouter key for live JEV (else heuristic) |
 | `ultimate-pi setup memory` | Optional DeepSeek key / observational memory |

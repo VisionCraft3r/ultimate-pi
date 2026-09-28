@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Routing manual** in the managed `AGENTS.md` block: continuation crumbs, tier rules, a cap of 3 concurrent implementation panes, `subagent_question` handling, cache discipline, and the grantable tool list. Model ids stay in the parameterized agent table.
-- **`video-ads` role** for HyperFrames / promo leaves, with installer-assigned models (OpenAI Codex preferred when that provider is configured) and skill discovery that does not hardcode a home path
 - **Preference defaults** applied only when unset: `neon-noir` theme, visible thinking, compaction, and graft hit/char limits. Observational memory starts enabled when it is installed. `npm:@spences10/pi-themes` is now required.
 - **macOS completion beep** is the default extra on darwin (`--yes` and the preselected prompt). The snippet is appended outside the managed markers and is not duplicated. iTerm2 status stays opt-in.
 - Docs: [docs/extensions.md](./docs/extensions.md) and [docs/improvements.md](./docs/improvements.md)
@@ -20,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ask_user_question` in child sessions** parks the question in the `.ask` sidecar and tells the child to wait. Option helpers live in `lib/`, not `extensions/`, so Pi does not try to load them as extensions.
 - **`launch-update`** on session start applies patch and minor npm updates that stay on known pins, and copies a newer checkout into the agent dir only after that checkout's tests pass. Point it at a checkout with `ULTIMATE_PI_ROOT`. Major bumps stay put.
 - **`qa_tester`** profile sets `thinking: medium`.
+
+### Removed
+
+- **`video-ads` role.** Install no longer writes that profile or routes video-ad work to it. An existing local `agents/video-ads.md` is left in place.
 
 ### Security
 

@@ -31,10 +31,6 @@
     "qa_tester": {
       "provider": "openrouter",
       "model": "deepseek/deepseek-chat"
-    },
-    "video-ads": {
-      "provider": "openrouter",
-      "model": "openai/gpt-4.1-mini"
     }
   },
   "providerChains": {

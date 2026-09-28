@@ -1,6 +1,6 @@
 # What a fresh install matches
 
-A new `ultimate-pi install` follows the same operating rules as the maintainer's Pi session: graft and pi-lens before broad reads, JEV tiers, a cap of three concurrent implementation panes, checkpointed milestones, cache discipline, and a dedicated video-ad role. Model ids stay yours.
+A new `ultimate-pi install` follows the same operating rules as the maintainer's Pi session: graft and pi-lens before broad reads, JEV tiers, a cap of three concurrent implementation panes, checkpointed milestones, and cache discipline. Model ids stay yours.
 
 This page is the delta that used to live only in one local agent directory. Extensions and skills are listed in [extensions.md](./extensions.md).
 
@@ -19,17 +19,7 @@ The block now includes:
 - Cache discipline via `/cache graph` and `/cache stats` when pi-cache-graph is installed
 - The grantable tool-name list
 
-The agent table and the 429 chains stay parameterized. Install writes whatever models you assigned. The template does not pin provider model ids.
-
-## `video-ads`
-
-Sixth shipped role, next to scout, worker, planner, researcher, and qa_tester. The orchestrator uses it instead of `worker` when the leaf is a video ad, promo, or HyperFrames composition. It counts toward the cap of 3. It is not a general code worker.
-
-The profile's `model:` is `{{model}}`. When OpenAI Codex is one of the providers you configured, `--yes` prefers that provider for this role, the same way researcher does, and still takes the model id from your catalog or your answers file. `thinking` is `high`. `qa_tester` uses `thinking: medium`.
-
-HyperFrames skills are read from Pi's normal skill discovery. The profile does not contain a home-directory path. If the skill is not installed, the agent stops and says so.
-
-Install writes `agents/video-ads.md` with the other role profiles.
+The agent table and the 429 chains stay parameterized. Install writes whatever models you assigned. The template does not pin provider model ids. `qa_tester` uses `thinking: medium`.
 
 ## Preferences applied when unset
 
@@ -68,6 +58,7 @@ On macOS, `--yes` and the extras prompt (preselected) enable the completion beep
 
 These are not in the repository and are not written by install:
 
+- The `video-ads` agent profile. It stays on the local Pi install and is not written or routed by Ultimate Pi
 - Agent model ids and `enabledModels` from the maintainer's `settings.json`
 - The hardcoded 429 hop names that used to sit in one local `AGENTS.md`
 - `auth.json`, web-search `auth.json`, OAuth tokens, and API keys
