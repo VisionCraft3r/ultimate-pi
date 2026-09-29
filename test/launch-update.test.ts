@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classifyNpmUpdate, copySource, gitCheckoutDir, nonNpmPackageNote, npmPackageName, parsePiVersion, plannotatorUpdateAllowed, versionAtLeast } from "../lib/launch-update.ts";
 import { copyExtensionTree, isExtensionFactorySource, unsafeExtensionEntries } from "../lib/extension-layout.ts";
-import { formatSidecarQuestion } from "../lib/question-helpers.ts";
+import { formatAnswers, formatSidecarQuestion, paperclipEnv, parseSubagentQuestion, questionsFromAsk } from "../lib/paperclip-questions.ts";
 import { writeAskSidecar } from "../lib/planner-handoff.ts";
 
 test("npm updates skip majors and patched pins", () => {
@@ -79,7 +79,20 @@ test("skill sync leaves the ignore file that turns skills off", () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-test("a subagent parks the question in the ask sidecar", () => {
+test("subagent questions become a Paperclip choice with Other", () => {
+  const parsed = parseSubagentQuestion('Sub-agent "planner" asks (4s):\n\nKeep the old name?\n\nReply with subagent_message({ name: "planner", message: "…" })');
+  assert.equal(parsed?.name, "planner");
+  assert.equal(parsed?.question, "Keep the old name?");
+  const questions = questionsFromAsk({
+    question: "Which layout?",
+    options: [{ label: "Grid" }, { label: "List" }],
+  });
+  assert.equal(questions[0]?.allowOther, true);
+  assert.equal(questions[0]?.options.length, 2);
+  assert.equal(formatAnswers(questions, [{ questionId: "q1", optionIds: ["grid"], otherText: "cards" }]), "Grid — cards");
+});
+
+test("a subagent without Paperclip env parks the question in the ask sidecar", () => {
   const root = mkdtempSync(join(tmpdir(), "upi-ask-"));
   const session = join(root, "session.jsonl");
   writeFileSync(session, "");
@@ -87,11 +100,18 @@ test("a subagent parks the question in the ask sidecar", () => {
     session: process.env.PI_SUBAGENT_SESSION,
     name: process.env.PI_SUBAGENT_NAME,
     agent: process.env.PI_SUBAGENT_AGENT,
+    api: process.env.PAPERCLIP_API_URL,
+    key: process.env.PAPERCLIP_API_KEY,
+    task: process.env.PAPERCLIP_TASK_ID,
   };
+  delete process.env.PAPERCLIP_API_URL;
+  delete process.env.PAPERCLIP_API_KEY;
+  delete process.env.PAPERCLIP_TASK_ID;
   process.env.PI_SUBAGENT_SESSION = session;
   process.env.PI_SUBAGENT_NAME = "billing-portal-planner";
   process.env.PI_SUBAGENT_AGENT = "planner";
   try {
+    assert.equal(paperclipEnv(), null);
     const question = formatSidecarQuestion({
       question: "How should the spec be grounded?",
       details: "The workspace has no source code.",
@@ -114,6 +134,12 @@ test("a subagent parks the question in the ask sidecar", () => {
     else process.env.PI_SUBAGENT_NAME = previous.name;
     if (previous.agent === undefined) delete process.env.PI_SUBAGENT_AGENT;
     else process.env.PI_SUBAGENT_AGENT = previous.agent;
+    if (previous.api === undefined) delete process.env.PAPERCLIP_API_URL;
+    else process.env.PAPERCLIP_API_URL = previous.api;
+    if (previous.key === undefined) delete process.env.PAPERCLIP_API_KEY;
+    else process.env.PAPERCLIP_API_KEY = previous.key;
+    if (previous.task === undefined) delete process.env.PAPERCLIP_TASK_ID;
+    else process.env.PAPERCLIP_TASK_ID = previous.task;
     rmSync(root, { recursive: true, force: true });
   }
 });

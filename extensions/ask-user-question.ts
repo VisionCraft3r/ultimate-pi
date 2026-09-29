@@ -6,8 +6,9 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fileURLToPath } from "node:url";
+import { askOnPaperclip, formatSidecarQuestion, paperclipEnv, parseSubagentQuestion, questionsFromAsk } from "../lib/paperclip-questions.ts";
 import { writeAskSidecar } from "../lib/planner-handoff.ts";
-import { formatSidecarQuestion, getOtherLabel, normalizeOptions, type AskOption } from "../lib/question-helpers.ts";
+import { getOtherLabel, normalizeOptions, type AskOption } from "../lib/question-helpers.ts";
 
 export { getOtherLabel, normalizeOptions };
 
@@ -139,6 +140,23 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 	pi.on("session_start", () => {
 		registerForSubagents("ask_user_question", THIS_FILE);
 	});
+	pi.on("before_agent_start", async (event) => {
+		if (!paperclipEnv()) return;
+		const parsed = parseSubagentQuestion(event.prompt);
+		if (!parsed) return;
+		const answer = await askOnPaperclip({
+			title: `${parsed.name} asks`,
+			questions: questionsFromAsk({ question: parsed.question }),
+		});
+		if ("error" in answer) return;
+		return {
+			message: {
+				customType: "paperclip_answer",
+				content: `The human answered in Paperclip: ${answer.text}\nCall subagent_message({ name: "${parsed.name}", message: ${JSON.stringify(answer.text)} }) now. Do not answer the question yourself.`,
+				display: true,
+			},
+		};
+	});
 	pi.registerTool({
 		name: "ask_user_question",
 		label: "Ask User",
@@ -155,6 +173,14 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				multiSelect,
 				options: options.map((o) => o.label),
 			};
+			if (paperclipEnv()) {
+				const answer = await askOnPaperclip({
+					title: params.question,
+					questions: questionsFromAsk(params),
+				});
+				if ("error" in answer) return reply(answer.error, { ...base, answer: null, cancelled: true, error: answer.error });
+				return reply(`User answered: ${answer.text}`, { ...base, answer: answer.text });
+			}
 			if (process.env.PI_SUBAGENT_SESSION?.trim()) {
 				const parked = writeAskSidecar(formatSidecarQuestion({
 					question: params.question,

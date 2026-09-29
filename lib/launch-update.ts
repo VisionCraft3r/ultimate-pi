@@ -200,6 +200,7 @@ export function findUltimatePiSource(): string | null {
   const fromEnv = process.env.ULTIMATE_PI_ROOT?.trim();
   const candidates = [
     fromEnv,
+    join(homedir(), "Documents/UltimatePI/ultimate-pi"),
     fileURLToPath(new URL("..", import.meta.url)),
   ].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {

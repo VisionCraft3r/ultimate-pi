@@ -1,0 +1,39 @@
+{
+  "name": "@visioncraft3r/ultimate-pi-paperclip",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Paperclip adapter and setup page for Ultimate PI.",
+  "license": "MIT",
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/index.js",
+    "./ui-parser": "./dist/ui-parser.js"
+  },
+  "paperclip": {
+    "adapterUiParser": "1.0.0"
+  },
+  "paperclipPlugin": {
+    "manifest": "./dist/plugin/manifest.js",
+    "worker": "./dist/plugin/worker.js",
+    "ui": "./dist/ui/"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "build": "node scripts/build.mjs",
+    "patch:ui": "node scripts/patch-paperclip-ui.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@paperclipai/plugin-sdk": "2026.916.1"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "esbuild": "^0.25.0",
+    "react": "^19.1.0",
+    "typescript": "^5.7.2"
+  }
+}
