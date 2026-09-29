@@ -22,6 +22,8 @@
       "./extensions/custom-header.ts",
       "./extensions/ask-user-question.ts",
       "./extensions/scout-budget.ts",
+      "./extensions/qa-budget.ts",
+      "./extensions/bmad-bridge.ts",
       "./extensions/launch-update.ts",
       "./extensions/bash-guard/index.ts",
       "./extensions/browser/index.ts",
@@ -68,7 +70,7 @@
     "@types/node": "^22.10.0"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test": "node --experimental-strip-types --test --test-isolation=none test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "scan": "node scripts/scan-secrets.mjs && node scripts/scan-personal.mjs",
     "smoke": "node scripts/smoke-install.mjs"

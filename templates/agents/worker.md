@@ -46,4 +46,4 @@ If a child (scout/researcher) asks you a question, do **not** answer it. Call `a
 How you verified (tests run, build succeeded).
 
 ## Notes
-Caveats, follow-ups, decisions made.
+Caveats, follow-ups, decisions made. When a decision is a repo-wide rule the next story would get wrong, append one line to `.pi/invariants.md` and do not create that file until the first rule. A choice that belongs only to this story stays in these notes.

@@ -24,7 +24,7 @@ Does not embed a fixed list of model ids.
 
 ### `scout-budget`
 
-Caps `scout` at 20 tool rounds. A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one more turn to return the file and line map. A 21st round is blocked. The extension no-ops unless `PI_SUBAGENT_AGENT` is `scout`, so worker is unchanged. Install also passes `--no-lens-context` on the scout launch only: pi-lens stays loaded and its tools stay available, and its session-start and turn-end notes are not written into scout's prompt. Worker and planner do not get that flag.
+Caps `scout` at 20 tool rounds. A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one more turn to return the file and line map. A 21st round is blocked. The extension no-ops unless `PI_SUBAGENT_AGENT` is `scout`, so worker is unchanged. Install passes `--no-lens-context` on the scout launch only, and does not attach the pi-lens tool list to scout. Scout keeps `graft_find_code` and `graft_repo_map`. Worker and planner keep the full lists. A child's thinking level is a `--thinking` flag, not a suffix on the model id.
 
 ### `model-agents`
 

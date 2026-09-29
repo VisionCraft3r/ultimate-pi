@@ -21,7 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`qa_tester`** profile sets `thinking: medium`.
 - **`/jobs`** records background processes left by bash commands bash-guard allows, under `<agentDir>/jobs`. `/jobs` lists them. `/jobs kill <pid>` stops a recorded pid and its children. Worker can start them. qa_tester can kill them and cannot start them. The parent session can do both.
 - **Scout tool-round ceiling.** Scout stops after 20 tool rounds (one assistant message that contains tool calls). Round 20 still runs, then scout has one chance to return the file and line map. A 21st round is blocked. Worker is unchanged.
-- **Scout `--no-lens-context`.** pi-lens stays loaded and its tools stay available. Session-start and turn-end notes are not written into scout's prompt. Worker and planner do not get the flag.
+- **Scout `--no-lens-context`.** pi-lens is not attached to scout. Scout keeps `graft_find_code` and `graft_repo_map`. Worker and planner keep the full lists. Session-start and turn-end notes are not written into scout's prompt.
+- **Child thinking flag.** Subagents pass `--thinking` separately. The level is not glued onto the model id.
+- **QA tool-round ceiling.** `qa_tester` stops after 20 tool rounds and must return pass or fail and the failing step.
+- **`.pi/invariants.md`.** The planner reads it when it exists. Planner and worker append one line only for a repo-wide rule the next story would get wrong.
+- **BMAD project choice.** A v6 tree (`_bmad` plus `.agents/skills/bmad-agent-*`) asks once: BMAD agents, or Ultimate PI agents. The answer is `{project}/.pi/agent-system`. Ultimate PI mode folds persona principles into the existing roles and still routes with `jev_triage`. A planner brief gets one planning persona. A story under `implementation_artifacts` that already names files skips scout. BMAD mode loads `.agents/skills` and does not remap that work onto the five roles. An older v6 install can run `bmad-method` quick-update; `_bmad/custom/` is hashed before and after. A decline is remembered per latest version. A non-v6 tree is not migrated.
 - **`pi-context-view`** is required. Parent-only `/context`. It adds no model instructions.
 - **`@lucascardozo/pi-edit-guard`** is required and loads only on child agents that already have `edit` or `write`.
 

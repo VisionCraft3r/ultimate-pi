@@ -179,8 +179,8 @@ Ultimate Pi does not install a video-ad role. A profile already at
 `agents/video-ads.md` is left in place. The next `ultimate-pi setup agents`
 rewrites the managed routing block and stops assigning that role.
 
-Scout launches with `--no-lens-context`. pi-lens stays loaded and its tools
-stay available. Its session-start and turn-end notes are not written into
+Scout launches with `--no-lens-context`. pi-lens is not attached to scout.
+Scout keeps `graft_find_code` and `graft_repo_map`. Its session-start and turn-end notes are not written into
 scout's prompt. Worker and planner do not get that flag. Worker has no
 tool-round ceiling.
 

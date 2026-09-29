@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { configurePackagesAndKeys, assertGitAvailableForSpecs, gitMissingMessage } from "../installer/packages.mjs";
 import { ensureEditGuardChildGate } from "../installer/edit-guard-child.mjs";
-import { ensureScoutChildLaunch } from "../installer/scout-child.mjs";
+import { ensureScoutChildLaunch, ensureScoutToolDiet, ensureSeparateThinkingFlag } from "../installer/scout-child.mjs";
 import { doctor } from "../installer/doctor.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -344,5 +344,55 @@ test("scout child launch adds the lens flag only inside the sandbox loop", () =>
   assert.match(applied.source, /loadout\.agent === "scout"/);
   assert.match(applied.source, /--no-lens-context/);
   assert.match(applied.source, /scout-budget\.ts/);
+  assert.match(applied.source, /loadout\.agent === "qa_tester"/);
+  assert.match(applied.source, /qa-budget\.ts/);
   assert.equal(ensureScoutChildLaunch(applied.source).status, "already-applied");
+});
+
+test("a launcher that already has the scout branch gains the QA cap", () => {
+  const scoutOnly = ensureScoutChildLaunch(SANDBOX_FIXTURE).source.replace(
+    /\n {4}if \(loadout\.agent === "qa_tester"\) \{[\s\S]*?\n {4}\}\n/,
+    "\n",
+  );
+  assert.doesNotMatch(scoutOnly, /qa-budget\.ts/);
+  const upgraded = ensureScoutChildLaunch(scoutOnly);
+  assert.equal(upgraded.status, "applied");
+  assert.match(upgraded.source, /qa-budget\.ts/);
+  assert.match(upgraded.source, /--no-lens-context/);
+  assert.equal(ensureScoutChildLaunch(upgraded.source).status, "already-applied");
+});
+
+const THINKING_FIXTURE = `    const model = loadout.thinking ? \`\${loadout.model}:\${loadout.thinking}\` : loadout.model;
+    parts.push("--model", shellEscape(model));
+`;
+
+test("thinking level is a flag and is not glued onto the model id", () => {
+  const missing = ensureSeparateThinkingFlag("export function launch() { return true; }\n");
+  assert.equal(missing.status, "skipped");
+  const applied = ensureSeparateThinkingFlag(THINKING_FIXTURE);
+  assert.equal(applied.status, "applied");
+  assert.match(applied.source, /parts\.push\("--model", shellEscape\(loadout\.model\)\)/);
+  assert.match(applied.source, /parts\.push\("--thinking", shellEscape\(loadout\.thinking\)\)/);
+  assert.doesNotMatch(applied.source, /loadout\.model\}:\$\{loadout\.thinking/);
+  assert.equal(ensureSeparateThinkingFlag(applied.source).status, "already-applied");
+});
+
+const DIET_FIXTURE = `export function contextExtensionsForChild(grantedTools: ReadonlySet<string>): { paths: string[]; tools: string[] } {
+    if (pkg.whenTools && !pkg.whenTools.some((tool) => grantedTools.has(tool))) continue;
+    paths.push(...entries);
+    tools.push(...pkg.tools);
+    const context = contextExtensionsForChild(granted);
+}
+`;
+
+test("scout child context keeps two graft tools and drops pi-lens", () => {
+  const missing = ensureScoutToolDiet("export function launch() { return true; }\n");
+  assert.equal(missing.status, "skipped");
+  const applied = ensureScoutToolDiet(DIET_FIXTURE);
+  assert.equal(applied.status, "applied");
+  assert.match(applied.source, /agent\?: string/);
+  assert.match(applied.source, /pi-lens"\) continue/);
+  assert.match(applied.source, /graft_find_code", "graft_repo_map"/);
+  assert.match(applied.source, /contextExtensionsForChild\(granted, loadout\.agent\)/);
+  assert.equal(ensureScoutToolDiet(applied.source).status, "already-applied");
 });

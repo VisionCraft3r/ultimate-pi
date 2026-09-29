@@ -46,11 +46,21 @@ On macOS, `--yes` and the extras prompt (preselected) enable the completion beep
 
 bash-guard wraps every bash command it allows. Background pids still in the shell job table are written under `<agentDir>/jobs`. `/jobs` lists them. `/jobs kill <pid>` stops that pid and its children, and refuses a pid that was not recorded. Worker starts them. qa_tester has no bash tool, so it can kill a recorded job and cannot start one. The parent session can do both.
 
+## BMAD projects
+
+A v6 install is detected from `_bmad` and `.agents/skills/bmad-agent-*`. The first interactive session asks once: BMAD agents, or Ultimate PI agents. The answer is stored in `{project}/.pi/agent-system` and changes only when you ask, including `/agent-system`.
+
+Ultimate PI mode still calls `jev_triage`. Personas are a short card: name, role, and at most five principles. The planner brief gets one of them (architect, ux-designer, pm, or sm) matching the ask. If a story under `implementation_artifacts` already names files, that list is the map and scout is not spawned. Models stay the five roles from install. They are not asked again.
+
+BMAD mode loads `.agents/skills` and does not send that work to scout, worker, planner, or qa_tester. Bash-guard, edit-guard, and `/jobs` stay on.
+
+An older v6 version can be refreshed with `npx --yes bmad-method@latest install --yes --action quick-update --directory <project>` after you confirm. `_bmad/custom/` is hashed before and after. A changed custom file is not reported as success. Declining writes `declined <latest>` in `.pi/bmad-update`. A tree that is not v6 is left for a manual migration.
+
 ## Scout stops after 20 tool rounds
 
 A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one chance to return the file and line map. A 21st round is blocked. Worker is unchanged. The ceiling is also written in `templates/agents/scout.md`.
 
-Scout launches with `--no-lens-context`. pi-lens stays loaded, and its tools stay available. The session-start and turn-end notes are not written into scout's prompt. Worker and planner do not get that flag.
+Scout launches with `--no-lens-context`, and pi-lens is not attached to that child. Scout keeps `graft_find_code` and `graft_repo_map`. The rest of the graft and pi-lens tool lists stay on worker and planner. A child's thinking level is passed with `--thinking`, not glued onto the model id.
 
 ## Quota switches stay inside the models you enabled
 
