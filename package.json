@@ -70,7 +70,7 @@
     "@types/node": "^22.10.0"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test --test-isolation=none test/*.test.ts",
+    "test": "node scripts/run-tests.mjs",
     "typecheck": "tsc --noEmit",
     "scan": "node scripts/scan-secrets.mjs && node scripts/scan-personal.mjs",
     "smoke": "node scripts/smoke-install.mjs"

@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.x"
+          node-version: "24"
       - run: npm ci
       - name: Install tmux (Ubuntu)
         if: runner.os == 'Linux'
@@ -32,9 +32,9 @@ jobs:
           fi
       - run: npm run typecheck
       - name: Run tests
-        # installer-packages prints multi-byte doctor lines. Under process
-        # isolation the Node test runner then fails with "Unable to deserialize
-        # cloned data". npm test sets --test-isolation=none, which passes.
+        # Node 24 process isolation plus the doctor check marks corrupts the
+        # test runner IPC. scripts/run-tests.mjs keeps Node 24 in-process and
+        # Node 22 at one file at a time.
         run: npm test
       - run: npm run scan
       - run: npm run smoke
