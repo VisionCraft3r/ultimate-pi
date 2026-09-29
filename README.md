@@ -23,7 +23,7 @@
 
 Ultimate Pi is a batteries-included configuration and extension pack for the
 [Pi coding agent](https://pi.dev) by Mario Zechner ([earendil-works/pi](https://github.com/earendil-works/pi)).
-It wires up tiered task routing, a five-role subagent team, tool allowlisting,
+It wires up tiered task routing, a six-role subagent team, tool allowlisting,
 cross-provider rate-limit fallback, and a handful of quality-of-life
 extensions (bash safety guard, browser QA tools, web fetch/search, prompt
 snippets, required pi-lens/graft code intelligence, parent-only context view, edit-guard on editing agents, and optional memory/cache)
@@ -35,10 +35,10 @@ third party. See [NOTICE.md](./NOTICE.md) for full attribution.
 
 ## Features
 
-- **JEV tiered routing** — every request is classified into `tier_0`…`tier_4_qa`
+- **JEV tiered routing** — every request is classified into `tier_0`…`tier_5_review`
   so cheap/local work stays in the main session and complex work fans out.
-- **Five-role subagent team** — `scout`, `worker`, `planner`, `researcher`,
-  and `qa_tester`, each with its own tool allowlist and a model
+- **Six-role subagent team** — `scout`, `worker`, `planner`, `researcher`,
+  `qa_tester`, and `reviewer`, each with its own tool allowlist and a model
   you assign at install. See [docs/improvements.md](./docs/improvements.md)
   and [docs/extensions.md](./docs/extensions.md).
 - **Tool allowlisting** — subagents launch with `--no-extensions` and an
@@ -132,7 +132,7 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
 2. **Providers** — select and authenticate one or more model providers
    (OAuth via Pi's `/login`, a masked API-key prompt, or a local
    OpenAI-compatible endpoint: base URL and model ids in `models.json`).
-3. **Agent models** — assign a primary model to each of the five agent roles.
+3. **Agent models** — assign a primary model to each of the six agent roles.
 4. **Fallbacks** — configure global per-provider 429 chains and optional
    per-agent overrides.
 5. **JEV** (optional) — an OpenRouter key for tiered routing; skippable, with
@@ -174,6 +174,7 @@ See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 | `planner` | architecture breakdowns; `handoff_spec` opens the spec in Plannotator |
 | `researcher` | web research, external docs |
 | `qa_tester` | drives a live browser/UI |
+| `reviewer` | read-only verdict after a worker wave, and on a code or project audit |
 
 Ultimate Pi does not install a video-ad role. A profile already at
 `agents/video-ads.md` is left in place. The next `ultimate-pi setup agents`
@@ -223,11 +224,14 @@ request into a tier before deciding how to handle it:
 | `tier_2` | needs a location scout first — `scout` then `worker` |
 | `tier_3` | new subsystem or architecture — `planner` |
 | `tier_4_qa` | needs a live browser/UI — `qa_tester` |
+| `tier_5_review` | read-only code or project audit — `reviewer` |
 
 `tier_4_qa` is composed from a UI-likelihood threshold (`noul ≥ 0.75`) and a
-confidence threshold (`≥ 0.7`). Results below 70% confidence for
-`tier_3`/`tier_4_qa`, or below 50% for other tiers, are treated as low
-confidence and flagged.
+confidence threshold (`≥ 0.7`). `tier_5_review` is a separate code-review
+noul with the same thresholds, so the word "review" does not steal a fix or
+a plan. Results below 70% confidence for `tier_3`/`tier_4_qa`/`tier_5_review`,
+or below 50% for other tiers, are treated as low confidence and flagged.
+Implementation tiers still end with one `reviewer` after the worker wave.
 
 JEV itself is **[Jev](https://openrouter.ai/typesafe/jev-1.13)**, a proprietary
 System One decision model by [TypeSafe AI](https://typesafe.ai/), accessed via
@@ -250,10 +254,13 @@ flowchart LR
     J -->|tier_2| S[scout] --> W
     J -->|tier_3| P[planner] --> W
     J -->|tier_4_qa| Q[qa_tester]
+    J -->|tier_5_review| Rev[reviewer]
+    W --> Rev
     W --> T[tmux pane]
     S --> T
     P --> T
     Q --> T
+    Rev --> T
 ```
 
 Subagents launch with `--no-extensions` and an explicit `--tools` allowlist

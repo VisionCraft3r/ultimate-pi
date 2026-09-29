@@ -137,6 +137,7 @@ test("applySettings persists providerChains and agentFallbacks into model-agents
       planner: { provider: "anthropic", model: "claude-opus-4.6" },
       researcher: { provider: "openai-codex", model: "gpt-5.4" },
       qa_tester: { provider: "openrouter", model: "openai/gpt-4.1-mini" },
+      reviewer: { provider: "anthropic", model: "claude-sonnet-4.6" },
     };
     const providerChains = {
       anthropic: [{ provider: "openai-codex", id: "gpt-5.4" }],
@@ -209,6 +210,7 @@ test("applySettings backs up preexisting settings, model-agents, AGENTS.md, and 
       planner: assignment,
       researcher: assignment,
       qa_tester: assignment,
+      reviewer: assignment,
     };
 
     await applySettings({ agentDir: dir }, { agentAssignments, packages: [] });

@@ -52,9 +52,9 @@ The BMAD bridge is optional and is not part of a default install. Install asks a
 
 A v6 install is detected from `_bmad` and `.agents/skills/bmad-agent-*`. The first interactive session asks once: BMAD agents, or Ultimate PI agents. The answer is stored in `{project}/.pi/agent-system` and changes only when you ask, including `/agent-system`.
 
-Ultimate PI mode still calls `jev_triage`. Personas are a short card: name, role, and at most five principles. The planner brief gets one of them (architect, ux-designer, pm, or sm) matching the ask. If a story under `implementation_artifacts` already names files, that list is the map and scout is not spawned. Models stay the five roles from install. They are not asked again.
+Ultimate PI mode still calls `jev_triage`. Personas are a short card: name, role, and at most five principles. The planner brief gets one of them (architect, ux-designer, pm, or sm) matching the ask. If a story under `implementation_artifacts` already names files, that list is the map and scout is not spawned. Models stay the six roles from install, including `reviewer`. They are not asked again. After a worker wave changes source, the parent spawns one reviewer.
 
-BMAD mode loads `.agents/skills` and does not send that work to scout, worker, planner, or qa_tester. Bash-guard, edit-guard, and `/jobs` stay on.
+BMAD mode loads `.agents/skills` and does not send that work to scout, worker, planner, qa_tester, or reviewer. Bash-guard, edit-guard, and `/jobs` stay on.
 
 An older v6 version can be refreshed with `npx --yes bmad-method@latest install --yes --action quick-update --directory <project>` after you confirm. `_bmad/custom/` is hashed before and after. A changed custom file is not reported as success. Declining writes `declined <latest>` in `.pi/bmad-update`. A tree that is not v6 is left for a manual migration.
 

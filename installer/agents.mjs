@@ -9,11 +9,13 @@ const MODELS_BY_PROVIDER = DEFAULT_MODELS_BY_PROVIDER;
 
 // Default --yes routing when that provider was selected/authenticated this run.
 // qa_tester has no per-role preference: first selected provider's catalog entry.
+// reviewer prefers anthropic when that is not already the worker's provider.
 const PREFERRED_PROVIDER_BY_ROLE = {
   scout: "cursor",
   worker: "cursor",
   researcher: "openai-codex",
   planner: "anthropic",
+  reviewer: "anthropic",
 };
 
 function isCancelled(value) {
@@ -61,8 +63,17 @@ function assignmentsFromAnswers(answers) {
   const out = {};
   for (const name of AGENT_NAMES) {
     const row = map[name];
-    if (!row?.provider || !row?.model) return null;
-    out[name] = { provider: row.provider, model: row.model };
+    if (row?.provider && row?.model) {
+      out[name] = { provider: row.provider, model: row.model };
+      continue;
+    }
+    // Older answers files predate reviewer. Copy the planner seat into a
+    // distinct reviewer entry so the rest of the file is not discarded.
+    if (name === "reviewer" && map.planner?.provider && map.planner?.model) {
+      out.reviewer = { provider: map.planner.provider, model: map.planner.model };
+      continue;
+    }
+    return null;
   }
   return out;
 }
@@ -70,6 +81,18 @@ function assignmentsFromAnswers(answers) {
 function firstCatalogAssignment(providerId, providers) {
   const models = modelsForProvider(providerId, providers);
   return { provider: providerId, model: models[0] || "default" };
+}
+
+function reviewerDefault(providerIds, providers, workerAssignment, fallback) {
+  const selected = new Set(providerIds);
+  const workerProvider = workerAssignment?.provider;
+  if (selected.has("anthropic") && workerProvider !== "anthropic") {
+    return firstCatalogAssignment("anthropic", providers);
+  }
+  const other = providerIds.find((id) => id && id !== workerProvider);
+  if (other) return firstCatalogAssignment(other, providers);
+  if (workerAssignment?.provider && workerAssignment?.model) return { ...workerAssignment };
+  return { ...fallback };
 }
 
 function defaultAssignments(providerIds, providers) {
@@ -80,6 +103,10 @@ function defaultAssignments(providerIds, providers) {
     : firstCatalogAssignment("anthropic", providers);
   const out = {};
   for (const name of AGENT_NAMES) {
+    if (name === "reviewer") {
+      out.reviewer = reviewerDefault(providerIds, providers, out.worker, fallback);
+      continue;
+    }
     const preferred = PREFERRED_PROVIDER_BY_ROLE[name];
     if (preferred && selected.has(preferred)) {
       out[name] = firstCatalogAssignment(preferred, providers);

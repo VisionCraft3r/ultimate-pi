@@ -1,10 +1,10 @@
 # Architecture
 
-Ultimate Pi sits on top of the [Pi coding agent](https://pi.dev). The main Pi session is the **orchestrator**. Incoming work is classified, then either answered in place or fanned out to a five-role subagent team. Each subagent runs in its own [tmux](https://github.com/tmux/tmux) pane via [`pi-interactive-subagents`](https://github.com/AmosIBoukir/pi-interactive-subagents) (HazAT's original plus Amos Blomqvist's tmux-only fork). See [NOTICE.md](../NOTICE.md) for attribution. The session rules users actually follow are in [improvements.md](./improvements.md); each extension is in [extensions.md](./extensions.md).
+Ultimate Pi sits on top of the [Pi coding agent](https://pi.dev). The main Pi session is the **orchestrator**. Incoming work is classified, then either answered in place or fanned out to a six-role subagent team. Each subagent runs in its own [tmux](https://github.com/tmux/tmux) pane via [`pi-interactive-subagents`](https://github.com/AmosIBoukir/pi-interactive-subagents) (HazAT's original plus Amos Blomqvist's tmux-only fork). See [NOTICE.md](../NOTICE.md) for attribution. The session rules users actually follow are in [improvements.md](./improvements.md); each extension is in [extensions.md](./extensions.md).
 
 This page covers four pieces that work together:
 
-1. JEV routing and the five agent roles
+1. JEV routing and the six agent roles
 2. Tool allowlisting (and the few extensions that re-inject into child sessions)
 3. Cross-provider 429 / quota fallback
 4. Planner spec handoff before workers fan out
@@ -17,10 +17,11 @@ For provider setup see [docs/providers.md](./providers.md). For JEV itself see [
 user → orchestrator (main session)
         → jev_triage
             → tier_0      answer in the main session (no subagent)
-            → tier_1      one worker
-            → tier_2      scout, then worker
-            → tier_3      planner → spec-ready review → workers
+            → tier_1      one worker, then reviewer if source changed
+            → tier_2      scout, then worker, then reviewer if source changed
+            → tier_3      planner → spec-ready review → workers → reviewer
             → tier_4_qa   qa_tester (live browser/UI)
+            → tier_5_review reviewer (code or project audit)
             → researcher  spawned when the orchestrator needs external docs
 ```
 
@@ -34,8 +35,9 @@ Every request hits `jev_triage` first. The classifier returns a tier; the orches
 | `planner` | `tier_3` | Architecture breakdowns; emits a spec via `handoff_spec` |
 | `researcher` | orchestrator decision (external docs / web) | Web research, third-party docs |
 | `qa_tester` | `tier_4_qa` | Drives a live browser/UI |
+| `reviewer` | after a worker wave; `tier_5_review` | Read-only verdict. Own model. No writes |
 
-`tier_4_qa` is composed from a UI-likelihood threshold (`noul ≥ 0.75`) and a confidence threshold (`≥ 0.7`). Low-confidence results (below 70% for `tier_3` / `tier_4_qa`, below 50% otherwise) are flagged rather than treated as a hard route. Without an OpenRouter key, triage falls back to a local keyword heuristic and prints `⚠ JEV not configured`.
+`tier_4_qa` is composed from a UI-likelihood threshold (`noul ≥ 0.75`) and a confidence threshold (`≥ 0.7`). `tier_5_review` is a separate `is_code_review` noul with the same thresholds. Low-confidence results (below 70% for `tier_3` / `tier_4_qa` / `tier_5_review`, below 50% otherwise) are flagged rather than treated as a hard route. Without an OpenRouter key, triage falls back to a local keyword heuristic and prints `⚠ JEV not configured`.
 
 ## Diagram
 
@@ -52,7 +54,9 @@ flowchart TB
     P -->|handoff_spec + .ask park| O
     O -->|spec-ready review| W
     J -->|tier_4_qa live UI| Q[qa_tester]
+    J -->|tier_5_review audit| Rev[reviewer]
     O -->|external docs needed| R[researcher]
+    W --> Rev
 
     subgraph tmux ["tmux panes via pi-interactive-subagents"]
         S
@@ -60,10 +64,11 @@ flowchart TB
         P
         R
         Q
+        Rev
     end
 ```
 
-At most three worker panes run at once. Each of `scout`, `worker`, `planner`, `researcher`, and `qa_tester` gets its own tmux pane. The orchestrator stays in the original session and talks to those panes; it does not share a process with them.
+At most three worker panes run at once. The reviewer does not count toward that cap. Each of `scout`, `worker`, `planner`, `researcher`, `qa_tester`, and `reviewer` gets its own tmux pane. The orchestrator stays in the original session and talks to those panes; it does not share a process with them.
 
 Scout launches with `--no-lens-context` and `extensions/scout-budget.ts`. A tool round is one assistant message that contains tool calls. Round 20 still runs, then scout has one chance to return the file and line map, and a 21st round is blocked. pi-lens is not attached to scout. Scout keeps `graft_find_code` and `graft_repo_map`. Worker and planner keep the full tool lists and do not get the flag. Worker is not capped. Child thinking levels use `--thinking` and are not glued onto the model id.
 

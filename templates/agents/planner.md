@@ -30,7 +30,7 @@ You may spawn only `scout` and `researcher`. Pick the agent with the `agent` fie
 
 - Recon: `subagent({ agent: "scout", name: "…", task: "…" })` — one unless two independent trees; emit in the same turn; do not poll. Results arrive as steer messages.
 - External docs: `subagent({ agent: "researcher", name: "…", task: "…" })`.
-- **Never** `agent: "worker"` or `qa_tester`. That call is rejected. Do not retry it, do not implement inline (you have no `bash`).
+- **Never** `agent: "worker"`, `qa_tester`, or `reviewer`. That call is rejected. Do not retry it, do not implement inline (you have no `bash`).
 
 `handoff_spec` opens the spec in the Plannotator browser and waits there for approval or revision notes. A line like “parked for Plannotator review” with no tool call is a hang.
 

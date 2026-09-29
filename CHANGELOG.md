@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`reviewer` role.** Read-only sixth agent with its own model assignment. `tier_1`, `tier_2`, and `tier_3` keep their current first role, then one reviewer covers the worker wave. `tier_5_review` is a JEV noul for a code audit, project audit, security review, or PR/diff review and starts with the reviewer. Blocking findings on an implementation tier repair for up to two rounds. An audit that only asks for findings stops at the report. Existing installs get `agents/reviewer.md` from `ultimate-pi setup agents` or a new install, not from a package update alone. An answers file that omits `reviewer` copies the planner assignment into a separate entry.
+
 ## [1.1.0-alpha] — 2026-09-28
 
 ### Added

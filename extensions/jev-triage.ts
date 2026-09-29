@@ -45,7 +45,7 @@ function priorUserRequest(ctx: ExtensionContext | undefined, current: string): s
 }
 
 function minConfidenceFor(choice: string): number {
-  if (choice === "tier_3" || choice === "tier_4_qa") return 70;
+  if (choice === "tier_3" || choice === "tier_4_qa" || choice === "tier_5_review") return 70;
   return 50;
 }
 
@@ -63,6 +63,37 @@ const CONTINUATION_FOCUS = "If prior_request is set, treat `request` as a contin
  * Choice is only tier_0..tier_3. Code composes the public routing key.
  */
 const TRIAGE_QUESTIONS = {
+  is_code_review: {
+    type: "noul",
+    instructions: {
+      question: "Is the primary deliverable of `request` a read-only assessment of existing code, with no plan to write and no implementation to do first?",
+      focus: CONTINUATION_FOCUS,
+    },
+    criteria: {
+      true: {
+        what: "The user wants a code audit, project audit, security review, adversarial review, or a review of a PR or diff, and the deliverable is findings rather than a spec or a code change.",
+        not_for: "Writing or approving a spec, a named fix, a bug hunt, a how-to, or driving a running UI. Those stay on their current tiers and the reviewer is appended there.",
+        examples: [
+          "audit the auth module",
+          "project audit",
+          "security review of this diff",
+          "review this PR",
+          "adversarial review of src/billing",
+        ],
+      },
+      false: {
+        what: "A plan or spec, a local fix, a bug investigation, an explanation, or a live UI session.",
+        not_for: "A dedicated read-only code or project audit.",
+        examples: [
+          "review the plan",
+          "create a plan for the billing rewrite",
+          "fix the typo in src/auth.ts",
+          "when I click submit nothing happens",
+          "click through checkout in the browser",
+        ],
+      },
+    },
+  },
   is_ui_test: {
     type: "noul",
     instructions: {
@@ -103,7 +134,7 @@ const TRIAGE_QUESTIONS = {
     criteria: {
       tier_0: {
         what: "Talk, explain, configure the tool (launch, keys, spawn engine), look up docs, business stats with no code change, how-to/where-to-click, a status check of work already done, or a same-thread ship crumb.",
-        not_for: "Any request to change project code, find files in the repo, design a system, or investigate a live product bug.",
+        not_for: "Any request to change project code, find files in the repo, design a system, investigate a live product bug, or audit existing code.",
         examples: [
           "what model are we using?",
           "the CLI doesn't launch, see why",
@@ -118,7 +149,7 @@ const TRIAGE_QUESTIONS = {
       },
       tier_1: {
         what: "A bounded project edit whose target is already named or obvious: one file, one function, a typo, or a specific error.",
-        not_for: "Unknown location, production forensics, multi-area changes, new systems, or a how-to.",
+        not_for: "Unknown location, production forensics, multi-area changes, new systems, a how-to, or a read-only code audit.",
         examples: [
           "fix the typo in src/auth.ts line 40",
           "rename getUser to fetchUser in api.ts",
@@ -127,7 +158,7 @@ const TRIAGE_QUESTIONS = {
       },
       tier_2: {
         what: "A bug or tweak to existing code whose files are not fully named: unnamed UI copy, a broken click, an agent report, or a production forensic (named customer/agent, live incident, admin/app not loading).",
-        not_for: "A named local fix, a new subsystem or architecture, or a how-to with no code change.",
+        not_for: "A named local fix, a new subsystem or architecture, a how-to with no code change, or a read-only audit.",
         examples: [
           "when I click the agent link I get an empty list",
           "one of my agents can't upload the file, make sure it's fixed",
@@ -142,7 +173,7 @@ const TRIAGE_QUESTIONS = {
       },
       tier_3: {
         what: "A new subsystem, architectural refactor, new page/surface, or an explicit ask to write a plan / spec before implementation.",
-        not_for: "A tweak or bugfix to an existing flow (including research-then-fix on messaging/queue/copy), a named local fix, or a how-to.",
+        not_for: "A tweak or bugfix to an existing flow (including research-then-fix on messaging/queue/copy), a named local fix, a how-to, or a read-only audit of code that already exists.",
         examples: [
           "build a page for customers to order a custom report",
           "create a plan for these improvements",
@@ -162,7 +193,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "jev_triage",
     label: "JEV Triage Gateway",
-    description: "Classifies the user's exact request into a routing tier (tier_0, tier_1, tier_2, tier_3, tier_4_qa). Pass the user's wording verbatim — do not rewrite it. The tool attaches the previous user turn from the session as prior_request.",
+    description: "Classifies the user's exact request into a routing tier (tier_0, tier_1, tier_2, tier_3, tier_4_qa, tier_5_review). Pass the user's wording verbatim — do not rewrite it. The tool attaches the previous user turn from the session as prior_request.",
     parameters: Type.Object({
       prompt: Type.String({ description: "The user's exact request string, verbatim" })
     }),
@@ -208,6 +239,15 @@ export default function (pi: ExtensionAPI) {
         if (noul >= UI_TEST_NOUL_THRESHOLD && noulConfident) {
           const confidencePct = Math.round((noulConf ?? noul) * 100);
           return { content: [{ type: "text", text: triageText("tier_4_qa", confidencePct) }], details: {} };
+        }
+
+        const review = data.answers?.is_code_review;
+        const reviewNoul = typeof review?.noul === "number" ? review.noul : 0;
+        const reviewConf = typeof review?.confidence === "number" ? review.confidence : undefined;
+        const reviewConfident = reviewConf === undefined || reviewConf >= UI_TEST_CONFIDENCE_THRESHOLD;
+        if (reviewNoul >= UI_TEST_NOUL_THRESHOLD && reviewConfident) {
+          const confidencePct = Math.round((reviewConf ?? reviewNoul) * 100);
+          return { content: [{ type: "text", text: triageText("tier_5_review", confidencePct) }], details: {} };
         }
 
         if (!answer || !answer.choice) {

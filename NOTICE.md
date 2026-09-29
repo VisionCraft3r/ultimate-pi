@@ -35,6 +35,7 @@ These remain `peerDependencies`. This package does not vendor them.
 ## Community Pi extensions (inspiration / optional install)
 
 - pi-interactive-subagents — original by HazAT ([MIT](https://github.com/HazAT/pi-interactive-subagents/blob/main/LICENSE)); tmux-only derivative maintained by Amos Blomqvist ([source](https://github.com/amosblomqvist/pi-interactive-subagents), [MIT license retaining © 2026 HazAT](https://github.com/amosblomqvist/pi-interactive-subagents/blob/main/LICENSE)).
+- The read-only `reviewer` role is inspired by the review contract in [HazAT/pi-config](https://github.com/HazAT/pi-config) (`skills/review/SKILL.md`, MIT, Copyright (c) 2026 Daniel Griesser). Ultimate Pi does not vendor that file. The profile, the JEV route, and the repair loop are original to this package. Superconductor orchestration from that repository is not included.
 - [pi-observational-memory](https://github.com/amosblomqvist/pi-observational-memory) — Amos Blomqvist, MIT.
 - [@gotgenes/pi-anthropic-auth](https://www.npmjs.com/package/@gotgenes/pi-anthropic-auth) — Chris Lasher, MIT.
 - [@schultzp2020/pi-cursor](https://www.npmjs.com/package/@schultzp2020/pi-cursor) — Paul Schultz, MIT.

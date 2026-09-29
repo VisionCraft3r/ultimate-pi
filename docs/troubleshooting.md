@@ -43,7 +43,7 @@ ultimate-pi setup extras
 
 ## `tmux` is missing (subagents will not spawn)
 
-**Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester each need their own tmux pane. Without `tmux`, the five-role team cannot launch (Windows needs WSL; native Windows is not supported).
+**Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester/reviewer each need their own tmux pane. Without `tmux`, the six-role team cannot launch (Windows needs WSL; native Windows is not supported).
 
 **Fix**
 
@@ -123,13 +123,19 @@ An empty-looking chain usually means setup fallbacks was skipped, `--yes` left d
 3. If doctor says fallbacks reference a provider with no credentials, add that provider or remove it from the chain — a fallback id with no auth is not a fallback.
 4. One configured provider and no chain ⇒ there is nowhere to fail over. Add a second provider, then re-run fallbacks.
 
+## Reviewer profile missing
+
+**Symptom:** routing names `reviewer`, but `<agentDir>/agents/reviewer.md` does not exist.
+
+A package update does not write that profile. `ultimate-pi setup agents` or a new install renders it from the template and splices the managed `AGENTS.md` block in the same step. Until that file exists, do not spawn `reviewer`.
+
 ## Re-running installer steps
 
 | Command | What it does |
 |---|---|
 | `ultimate-pi install` | Full walkthrough (preflight → providers → agents → fallbacks → JEV → memory → extras → apply → doctor) |
 | `ultimate-pi setup providers` | Select providers and capture OAuth/keys |
-| `ultimate-pi setup agents` | Assign models to scout/worker/planner/researcher/qa_tester |
+| `ultimate-pi setup agents` | Assign models to scout/worker/planner/researcher/qa_tester/reviewer and render `agents/*.md` plus the managed `AGENTS.md` block |
 | `ultimate-pi setup fallbacks` | Per-provider 429 chains and per-agent overrides |
 | `ultimate-pi setup jev` | OpenRouter key for live JEV (else heuristic) |
 | `ultimate-pi setup memory` | Optional DeepSeek key / observational memory |

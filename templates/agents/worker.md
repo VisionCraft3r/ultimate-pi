@@ -39,11 +39,19 @@ If a child (scout/researcher) asks you a question, do **not** answer it. Call `a
 
 ## Output format when done
 
+## Status
+DONE | BLOCKED
+
 ## Changes Made
 - `path/to/file.ts` — what changed and why
 
 ## Verification
-How you verified (tests run, build succeeded).
+- `command` — pass or fail, and the key output
+
+Do not report DONE without that command and its result. "Should work" is not verification.
+
+## Risks
+None, or the residual risk.
 
 ## Notes
 Caveats, follow-ups, decisions made. When a decision is a repo-wide rule the next story would get wrong, append one line to `.pi/invariants.md` and do not create that file until the first rule. A choice that belongs only to this story stays in these notes.

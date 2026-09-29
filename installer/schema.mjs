@@ -1,6 +1,6 @@
 /** Shared installer types: agent names, model refs, fallback-chain normalization. */
 
-export const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester"];
+export const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester", "reviewer"];
 export const SESSION_NAMES = ["main", ...AGENT_NAMES];
 export const MANAGED_AGENT_MARKER = "<!-- managed-by: ultimate-pi -->";
 export const AGENTS_MD_BEGIN = "<!-- ultimate-pi:begin -->";
@@ -160,7 +160,7 @@ export function normalizeAgentFallbacks(map, modelForProvider) {
 }
 
 export function modelForProviderFromAssignments(assignments = {}) {
-  const order = ["planner", "worker", "researcher", "scout", "qa_tester", "main"];
+  const order = ["planner", "reviewer", "worker", "researcher", "scout", "qa_tester", "main"];
   return (providerId) => {
     for (const name of order) {
       const row = assignments[name];

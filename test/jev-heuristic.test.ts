@@ -18,12 +18,33 @@ test("continuation crumbs classify as tier_0 at the confidence cap", () => {
 test("browser/e2e click-through prompts classify as tier_4_qa", () => {
 	for (const prompt of [
 		"click through the checkout flow in the browser",
+		"click through checkout in the browser",
 		"run e2e tests against the simulator",
 		"visually verify the login screen",
 	]) {
 		const result = classifyHeuristic(prompt);
 		assert.equal(result.tier, "tier_4_qa", prompt);
 		assert.equal(result.confidence, HEURISTIC_MAX_CONFIDENCE, prompt);
+	}
+});
+
+test("code and project audits classify as tier_5_review", () => {
+	for (const prompt of [
+		"code audit of the auth module",
+		"project audit",
+		"security review of this diff",
+		"architecture audit",
+	]) {
+		const result = classifyHeuristic(prompt);
+		assert.equal(result.tier, "tier_5_review", prompt);
+		assert.equal(result.confidence, HEURISTIC_MAX_CONFIDENCE, prompt);
+	}
+});
+
+test("plan prompts stay tier_3 and are not stolen by review wording", () => {
+	for (const prompt of ["review the plan", "create a plan for the billing rewrite"]) {
+		const result = classifyHeuristic(prompt);
+		assert.equal(result.tier, "tier_3", prompt);
 	}
 });
 
@@ -56,6 +77,7 @@ test("named files, function calls, and typos classify as tier_1", () => {
 		"refactor the payment retry logic in retry.ts",
 		"fix handleRetry( across three files",
 		"fix the typo in the checkout copy",
+		"fix the typo in src/auth.ts",
 	]) {
 		const result = classifyHeuristic(prompt);
 		assert.equal(result.tier, "tier_1", prompt);

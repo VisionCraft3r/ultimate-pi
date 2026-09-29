@@ -8,7 +8,7 @@ Commands below are typed inside a Pi session.
 
 ### `jev-triage`
 
-Classifies the user's exact wording into `tier_0` … `tier_4_qa`. Attaches the previous user turn for short continuations and skips re-triage of ship/continue crumbs. With an OpenRouter key it calls Jev; otherwise it uses a local keyword heuristic and says so.
+Classifies the user's exact wording into `tier_0` … `tier_5_review`. Attaches the previous user turn for short continuations and skips re-triage of ship/continue crumbs. With an OpenRouter key it calls Jev; otherwise it uses a local keyword heuristic and says so. `tier_4_qa` and `tier_5_review` are composed from separate noul questions so "click" and "review" do not steal a bug or a plan.
 
 Does not write code, invent file counts, or choose a model id.
 
@@ -28,7 +28,7 @@ Caps `scout` at 20 tool rounds. A round is one assistant message that contains t
 
 ### `model-agents`
 
-`/ModelAgents` edits the five role models and the 429 chains, and rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md`.
+`/ModelAgents` edits the six role models and the 429 chains, and rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md`.
 
 ### `planner-handoff`
 

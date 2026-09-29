@@ -14,7 +14,7 @@ function agentMarkdown(name, provider, model, thinking) {
   return `---\nname: ${name}\nmodel: ${provider}/${model}\n${thinkingLine}---\n\n<!-- managed-by: ultimate-pi -->\n`;
 }
 
-test("loadInstalledState reads packages, fallback chains, and five agent frontmatters", async () => {
+test("loadInstalledState reads packages, fallback chains, and six agent frontmatters", async () => {
   const dir = await makeTempDir();
   try {
     const packages = [
@@ -39,6 +39,7 @@ test("loadInstalledState reads packages, fallback chains, and five agent frontma
       planner: { provider: "anthropic", model: "claude-opus-4.6" },
       researcher: { provider: "openai-codex", model: "gpt-5.4" },
       qa_tester: { provider: "openrouter", model: "openai/gpt-4.1-mini" },
+      reviewer: { provider: "anthropic", model: "claude-opus-4.6" },
     };
 
     await writeFile(

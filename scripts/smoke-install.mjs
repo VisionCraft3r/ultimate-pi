@@ -64,7 +64,7 @@ try {
   for (const spec of ["npm:pi-lens", "npm:pi-graft", "npm:@spences10/pi-themes", "npm:pi-context-view", "npm:@lucascardozo/pi-edit-guard"]) {
     if (!settings.packages.includes(spec)) throw new Error(`missing required package ${spec}`);
   }
-  for (const name of ["scout", "worker", "planner", "researcher", "qa_tester"]) {
+  for (const name of ["scout", "worker", "planner", "researcher", "qa_tester", "reviewer"]) {
     if (!existsSync(join(agentDir, "agents", `${name}.md`))) throw new Error(`missing ${name} agent profile`);
   }
   ok("install --offline --yes --answers (exit 0; required tools and profiles present)");

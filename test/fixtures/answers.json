@@ -31,6 +31,10 @@
     "qa_tester": {
       "provider": "openrouter",
       "model": "deepseek/deepseek-chat"
+    },
+    "reviewer": {
+      "provider": "anthropic",
+      "model": "claude-opus-4.6"
     }
   },
   "providerChains": {

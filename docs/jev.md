@@ -30,8 +30,11 @@ Docs: [TypeSafe AI](https://typesafe.ai/), [TypeSafe docs](https://docs.typesafe
 | `tier_2` | Needs a location scout first | `scout`, then `worker` |
 | `tier_3` | New subsystem or architecture | `planner` → spec-ready review → `worker`s |
 | `tier_4_qa` | Needs a live browser/UI | `qa_tester` |
+| `tier_5_review` | Read-only code audit, project audit, security review, or PR/diff review | `reviewer` |
 
 `researcher` is not a JEV tier. The orchestrator spawns it when external docs or web research are needed.
+
+`tier_1`, `tier_2`, and `tier_3` keep their current first role. After a worker wave changes source, the orchestrator spawns one `reviewer` for that wave. `tier_5_review` is the only tier that starts with the reviewer. "Review the plan" and "create a plan" stay `tier_3`.
 
 Short continuation crumbs ("ok", "ship it", "alright") short-circuit to `tier_0` at confidence 100 so they cannot restart a plan.
 
@@ -42,9 +45,9 @@ QA is a **separate** JEV question (`is_ui_test`, a `noul`) so the word "click" i
 - `noul >= 0.75` **and**
 - UI-test confidence `>= 0.7` (if the API omits confidence, noul alone is enough)
 
-then the result is `tier_4_qa`. Otherwise the `task_tier` choice stands.
+then the result is `tier_4_qa`. Otherwise the code checks `is_code_review` the same way. That noul is true only when the deliverable is a read-only assessment and there is no plan or implementation to run first. If `noul >= 0.75` and confidence `>= 0.7` (confidence omitted means noul alone is enough), the result is `tier_5_review`. UI still wins when both match, because the reviewer has no browser tools. Otherwise the `task_tier` choice stands.
 
-Constants live in `extensions/jev-triage.ts` as `UI_TEST_NOUL_THRESHOLD = 0.75` and `UI_TEST_CONFIDENCE_THRESHOLD = 0.7`.
+Constants live in `extensions/jev-triage.ts` as `UI_TEST_NOUL_THRESHOLD = 0.75` and `UI_TEST_CONFIDENCE_THRESHOLD = 0.7`. The review noul uses those same numbers.
 
 ## Low-confidence warnings
 
@@ -52,7 +55,7 @@ Confidence is printed as a percentage. Below the floor for that tier, the tool s
 
 | Choice | Low-confidence floor |
 |---|---|
-| `tier_3`, `tier_4_qa` | below **70%** |
+| `tier_3`, `tier_4_qa`, `tier_5_review` | below **70%** |
 | all other tiers | below **50%** |
 
 Example: `Triage Result: tier_3. WARNING: Low confidence (62%). Orchestrator MUST use ask_question to verify this tier.`
@@ -71,7 +74,7 @@ Heuristic results always carry a **visible** warning so they cannot be mistaken 
 - no key: `⚠ JEV not configured — heuristic routing (run \`ultimate-pi setup jev\`).`
 - API/network miss: `⚠ JEV unavailable (<reason>).`
 
-Heuristic confidence is **capped at 60**. Combined with the 70% floor on `tier_3` / `tier_4_qa`, a heuristic plan-or-QA classification is always a low-confidence warning. Unmatched prompts come back as `tier_1` at confidence 45 (also a warning).
+Heuristic confidence is **capped at 60**. Combined with the 70% floor on `tier_3` / `tier_4_qa` / `tier_5_review`, a heuristic plan, QA, or audit classification is always a low-confidence warning. Unmatched prompts come back as `tier_1` at confidence 45 (also a warning). The heuristic matches `code audit`, `project audit`, `security review`, and `audit` before plan wording, so "architecture audit" is `tier_5_review`. Bare "review" does not match, so "review the plan" stays `tier_3`.
 
 Configure a key with `ultimate-pi setup jev` (or include `openrouter` in `ultimate-pi setup providers`). Skipping the key is valid; routing still works, just coarsely, with the warning on every call.
 
