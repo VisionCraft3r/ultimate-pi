@@ -36,6 +36,13 @@ const ALLOWED_BARE_HEX = new Set([
   publicHex("e37f908e912ade6eebfc4048e7bc7189", "8597f89f630da9f5c2fca1dd1db45324"),
 ]);
 
+// Paperclip skill identifiers used as `key: "..."` in test fixtures. They look
+// like assigned secrets to the pattern above but are public catalog names.
+const ALLOWED_ASSIGNED = new Set([
+  "paperclipai/paperclip/agentmail",
+  "paperclipai/paperclip/pdf-reader",
+]);
+
 function mask(value) {
   if (value.length <= 8) return "****";
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
@@ -64,6 +71,9 @@ function scanText(label, text, hits) {
       while ((match = pattern.re.exec(line)) !== null) {
         const value = match[1] ?? match[0];
         if (pattern.name === "Bare 40+ hex" && ALLOWED_BARE_HEX.has(value)) {
+          continue;
+        }
+        if (pattern.name === "Assigned secret-like value" && ALLOWED_ASSIGNED.has(value)) {
           continue;
         }
         hits.push({ label, lineNo: i + 1, kind: pattern.name, masked: mask(value) });

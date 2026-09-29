@@ -41,6 +41,25 @@ ultimate-pi setup extras
 
 `--offline` skips the `pi --help` probe and marks the check skipped, so it will not catch a missing binary.
 
+## `Cannot find module .../dist/bundle/chunks/...` after `pi update`
+
+**Symptom:** a model call fails with `Error: Cannot find module '.../@earendil-works/pi-coding-agent/dist/bundle/chunks/anthropic-messages-XXXX.js'` (or another `chunk-XXXX.js`) right after Pi was updated.
+
+**Cause:** Pi bundles its providers into hashed chunk files. `pi update` replaces them with new names. A Pi session (or tmux pane) that was already running keeps importing the old names, which no longer exist. The install is not broken.
+
+**Fix**
+
+1. Quit every running Pi session and tmux pane (`tmux ls`), then start a new one. A new session loads the updated chunks directly.
+2. If a session must stay open, point the old chunk name at the current one. Find the current file with `ls <pi install>/dist/bundle/chunks/anthropic-messages-*.js`, then create the missing name so it re-exports it:
+
+   ```js
+   export { stream, streamSimple } from "./anthropic-messages-<current hash>.js";
+   ```
+
+3. If the error persists in a new session, clear Node's compile cache: delete the `node-compile-cache` folder under your temp directory.
+
+Run `pi update` when no session is mid-task, since Ultimate PI subagents run in their own panes and keep the old bundle until restarted.
+
 ## `tmux` is missing (subagents will not spawn)
 
 **Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester/reviewer each need their own tmux pane. Without `tmux`, the six-role team cannot launch (Windows needs WSL; native Windows is not supported).
