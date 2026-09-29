@@ -1,0 +1,133 @@
+diff --git a/extensions/graft.ts b/extensions/graft.ts
+--- a/extensions/graft.ts
++++ b/extensions/graft.ts
+@@ -47,6 +47,8 @@
+ import { execFile, execFileSync, spawn } from "node:child_process";
+ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+ import { basename, dirname, isAbsolute, join } from "node:path";
++// Skip ship crumbs with the same matcher as jev-triage.
++import { isContinuationCrumb } from "../../../../lib/continuation-crumbs.ts";
+ 
+ // ── constants (mirror graft's own floors/caps) ─────────────────────────────
+ 
+@@ -54,6 +56,8 @@
+ const TOOL_TIMEOUT_MS = Number(process.env.GRAFT_TIMEOUT_MS ?? 30_000);
+ /** Prompt-hook ask budget: the 8s hook budget minus headroom for our own work. */
+ const ASK_TIMEOUT_MS = 6_000;
++/** How long a prompt may wait for retrieval before it is sent without it. */
++const ASK_BUDGET_MS = 1_500;
+ const CHECK_TIMEOUT_MS = 8_000;
+ /** Background structural rebuild budget (mirrors graft's sync-run). */
+ const BUILD_TIMEOUT_MS = 120_000;
+@@ -108,6 +112,44 @@
+     }
+     return null;
+   }
++}
++
++/** Async JSON call. A timeout or a missing graph resolves to null and never throws. */
++function graftJsonAsync(dir: string, args: string[], timeout: number): Promise<any | null> {
++  return new Promise((resolve) => {
++    const full = withContextDirArg(dir, args);
++    execFile(
++      GRAFT_BIN,
++      full,
++      { cwd: dir, encoding: "utf8", timeout, maxBuffer: 10 * 1024 * 1024 },
++      (_err, stdout) => {
++        const text = String(stdout ?? "").trim();
++        if (!text) {
++          resolve(null);
++          return;
++        }
++        try { resolve(JSON.parse(text)); }
++        catch { resolve(null); }
++      },
++    );
++  });
++}
++
++/** Resolve with the value, or null if the budget elapses first. The work keeps running. */
++function withBudget<T>(work: Promise<T>, budgetMs: number): Promise<T | null> {
++  return new Promise((resolve) => {
++    const timer = setTimeout(() => resolve(null), budgetMs);
++    work.then(
++      (value) => {
++        clearTimeout(timer);
++        resolve(value);
++      },
++      () => {
++        clearTimeout(timer);
++        resolve(null);
++      },
++    );
++  });
+ }
+ 
+ // ── graft paths (mirror util/state resolveContextDir/cacheDir) ──────────────
+@@ -573,12 +615,12 @@
+     // 2 · per-prompt retrieval (pointers only, gated).
+     try {
+       const prompt = String((event as any)?.prompt ?? "").trim();
+-      if (prompt.length >= MIN_PROMPT_CHARS) {
++      if (prompt.length >= MIN_PROMPT_CHARS && !isContinuationCrumb(prompt)) {
+         const askArgs = ["ask", prompt, ".", "--json", "-n", "3"];
+         const stats = readStats(cwd);
+         const scopeHint = lastFileScopeHint(cwd, stats?.lastFile);
+         if (scopeHint) askArgs.push("--in", scopeHint);
+-        const ask = graftJson(cwd, askArgs, ASK_TIMEOUT_MS) as AskJson | null;
++        const ask = await withBudget(graftJsonAsync(cwd, askArgs, ASK_TIMEOUT_MS), ASK_BUDGET_MS) as AskJson | null;
+         if (ask) {
+           const id = sid(ctx);
+           const s = readSession(cwd, id);
+@@ -641,16 +683,17 @@
+           patch = { ...patch, content };
+         }
+       }
+-      // Mark dirty + refresh the stale count (pure drift report, no rebuild).
+-      const check = graftJson(cwd, ["check", ".", "--json"], CHECK_TIMEOUT_MS) as any;
+-      const g = check?.graph ?? {};
+-      const staleCount =
+-        (g.changed?.length ?? 0) + (g.added?.length ?? 0) + (g.removed?.length ?? 0);
+-      patchStats(cwd, { dirty: true, staleCount, lastFile: basename(abs) });
+-      // A stale syncing flag from a killed build must not survive an edit:
+-      // the footer should show the real ⚠ stale state, not phantom syncing.
++      // Mark dirty immediately. The drift count arrives later and must not block the turn.
++      patchStats(cwd, { dirty: true, lastFile: basename(abs) });
+       healStaleSync(cwd);
+-      await refreshStatus(ctx, cwd);
++      const edited = basename(abs);
++      void graftJsonAsync(cwd, ["check", ".", "--json"], CHECK_TIMEOUT_MS).then(async (check) => {
++        const g = check?.graph ?? {};
++        const staleCount =
++          (g.changed?.length ?? 0) + (g.added?.length ?? 0) + (g.removed?.length ?? 0);
++        patchStats(cwd, { dirty: true, staleCount, lastFile: edited });
++        await refreshStatus(ctx, cwd);
++      });
+     } catch { /* post-edit work is advisory */ }
+ 
+     return patch;
+@@ -691,8 +734,16 @@
+     // Orphaned flag from a previous process that died mid-build: clear it so
+     // the footer is truthful even when this turn makes no edits (!dirty).
+     healStaleSync(cwd);
++    // Drift check stays off the event loop. Workers run --no-extensions, so parent
++    // write hooks never see their edits; this is what marks those trees dirty.
++    void graftJsonAsync(cwd, ["check", ".", "--json"], CHECK_TIMEOUT_MS).then(async (check) => {
++    if (syncing.has(cwd)) return;
+     let stats: Stats | null = null;
+     try { stats = readStats(cwd); } catch { return; }
++    const g = check?.graph ?? {};
++    const staleCount =
++      (g.changed?.length ?? 0) + (g.added?.length ?? 0) + (g.removed?.length ?? 0);
++    if (staleCount > 0) stats = patchStats(cwd, { dirty: true, staleCount });
+     if (!stats?.dirty) return;
+     syncing.add(cwd);
+     try { patchStats(cwd, { syncing: true, syncStartedAt: new Date().toISOString() }); } catch { /* ignore */ }
+@@ -743,6 +794,7 @@
+     // Reconcile locally: the detached run owns completion, this only clears
+     // our in-flight guard after a grace period (next settle retries if dirty).
+     setTimeout(() => { syncing.delete(dir); }, BUILD_TIMEOUT_MS);
++    });
+   });
+ 
+   // ── the six tools (MCP names, CLI-backed — pi has no MCP client) ──────────

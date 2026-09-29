@@ -8,8 +8,7 @@
  * To restore the built-in header: rename/delete this file and /reload.
  */
 
-import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
-import { rawKeyHint } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /**
  * Ultimate Pi logo. Matches the terminal art (256-color amber/gold/white).
@@ -28,10 +27,10 @@ function logoColors() {
 	};
 }
 
-function buildHeader(_theme: Theme): string {
+function buildHeader(): string {
 	const { amber, gold, white, dim, reset } = logoColors();
 
-	const logo = [
+	return [
 		"",
 		`${amber}   >_  ${white}THE ULTIMATE${reset}  ${gold}PI${reset}`,
 		`${amber}   ███████████████████████████╗${reset}`,
@@ -47,43 +46,17 @@ function buildHeader(_theme: Theme): string {
 		`${dim}              Multi-agent routing for the Pi CLI.${reset}`,
 		"",
 	].join("\n");
-
-	// ── Keybinding hints ─────────────────────────────────
-	// Built but not shown (same as before). Uncomment the return below to restore.
-	const hints = [
-		rawKeyHint("escape", "to interrupt"),
-		rawKeyHint("ctrl+c", "to clear"),
-		rawKeyHint("ctrl+c twice", "to exit"),
-		rawKeyHint("ctrl+d", "to exit (empty)"),
-		rawKeyHint("ctrl+z", "to suspend"),
-		rawKeyHint("ctrl+k", "to delete to end"),
-		rawKeyHint("shift+tab", "to cycle thinking level"),
-		rawKeyHint("ctrl+p/shift+ctrl+p", "to cycle models"),
-		rawKeyHint("ctrl+l", "to select model"),
-		rawKeyHint("ctrl+o", "to expand tools"),
-		rawKeyHint("ctrl+t", "to expand thinking"),
-		rawKeyHint("ctrl+g", "for external editor"),
-		rawKeyHint("/", "for commands"),
-		rawKeyHint("!", "to run bash"),
-		rawKeyHint("!!", "to run bash (no context)"),
-		rawKeyHint("alt+enter", "to queue follow-up"),
-		rawKeyHint("alt+up", "to edit all queued messages"),
-		rawKeyHint(process.platform === "win32" ? "alt+v" : "ctrl+v", "to paste image"),
-		rawKeyHint("drop files", "to attach"),
-	];
-	void hints;
-
-	// return `${logo}\n${hints.join("\n")}`;
-	return logo;
 }
+
+const HEADER_LINES = buildHeader().split("\n");
 
 export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
 
-		ctx.ui.setHeader((_tui, theme) => ({
-			render(_width: number): string[] {
-				return buildHeader(theme).split("\n");
+		ctx.ui.setHeader(() => ({
+			render(): string[] {
+				return HEADER_LINES;
 			},
 			invalidate() {},
 		}));

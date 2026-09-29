@@ -33,6 +33,19 @@ validate/normalize), instead of rejecting the snapshot:
 This keeps snapshots valid when a provider embeds a newline in a tool id
 (for example Cursor-style `call-1\nfc_2`).
 
+## `pi-graft-async-0.1.2.patch`
+
+| | |
+| --- | --- |
+| Package | [`pi-graft`](https://www.npmjs.com/package/pi-graft) **0.1.2** |
+| Target file | `extensions/graft.ts` |
+| Pre-image SHA-256 | `663479e235ac247211f64e5d6015995d8cff04e33726fc639eaa0b1edfe5e6bb` |
+| Post-image SHA-256 | `11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e` |
+
+### Intended behavior
+
+`graft ask` and `graft check` no longer run through `execFileSync` on the prompt, edit, or settle paths. A prompt waits at most 1.5s for retrieval and is sent without it if graft is slower. Drift checks after an edit and at settle update stats in the background. Continuation crumbs skip retrieval, matching jev-triage. A checksum that is not the published preimage or this post-image is left untouched.
+
 ## `pi-cursor-idle-0.5.2.patch`
 
 | | |

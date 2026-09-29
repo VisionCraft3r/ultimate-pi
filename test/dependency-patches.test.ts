@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { inspectDependencyPatch } from "../installer/dependency-patches.mjs";
+import { DEPENDENCY_PATCHES, inspectDependencyPatch } from "../installer/dependency-patches.mjs";
 
 const BEFORE = "fixture-before\n";
 const AFTER = "fixture-after\n";
@@ -37,6 +37,15 @@ async function writeFixture(agentDir: string, { version = DESCRIPTOR.version, bo
   );
   await writeFile(path.join(packageRoot, DESCRIPTOR.target), body);
 }
+
+test("pi-graft async patch is pinned to the published 0.1.2 preimage", () => {
+  const graft = DEPENDENCY_PATCHES.find((entry) => entry.name === "pi-graft");
+  assert.ok(graft);
+  assert.equal(graft.version, "0.1.2");
+  assert.equal(graft.target, "extensions/graft.ts");
+  assert.equal(graft.before, "663479e235ac247211f64e5d6015995d8cff04e33726fc639eaa0b1edfe5e6bb");
+  assert.equal(graft.after, "11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e");
+});
 
 test("ready when target matches the before hash", async () => {
   const agentDir = await makeAgentDir();

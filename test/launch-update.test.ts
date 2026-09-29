@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyNpmUpdate, copySource, gitCheckoutDir, nonNpmPackageNote, npmPackageName, parsePiVersion, plannotatorUpdateAllowed, versionAtLeast } from "../lib/launch-update.ts";
+import { classifyNpmUpdate, copySource, gitCheckoutDir, isSubagentSession, nonNpmPackageNote, npmCheckDue, npmPackageName, parsePiVersion, plannotatorUpdateAllowed, versionAtLeast } from "../lib/launch-update.ts";
 import { copyExtensionTree, isExtensionFactorySource, unsafeExtensionEntries } from "../lib/extension-layout.ts";
 import { formatAnswers, formatSidecarQuestion, paperclipEnv, parseSubagentQuestion, questionsFromAsk } from "../lib/paperclip-questions.ts";
 import { writeAskSidecar } from "../lib/planner-handoff.ts";
@@ -13,10 +13,22 @@ test("npm updates skip majors and patched pins", () => {
   assert.equal(classifyNpmUpdate("0.27.18", "1.0.0", "@plannotator/pi-extension"), "skip-major");
   assert.equal(classifyNpmUpdate("0.5.2", "0.5.3", "@schultzp2020/pi-cursor"), "skip-patch-pin");
   assert.equal(classifyNpmUpdate("0.5.2", "0.5.2", "@schultzp2020/pi-cursor"), "current");
+  assert.equal(classifyNpmUpdate("0.1.2", "0.2.0", "pi-graft"), "skip-patch-pin");
   assert.equal(parsePiVersion("0.87.1\n"), "0.87.1");
   assert.equal(versionAtLeast("0.87.1", "0.79.1"), true);
   assert.equal(plannotatorUpdateAllowed("@plannotator/pi-extension", "0.70.0"), false);
   assert.equal(plannotatorUpdateAllowed("pi-lens", "0.70.0"), true);
+});
+
+test("subagent sessions skip launch update and npm checks wait six hours", () => {
+  assert.equal(isSubagentSession({ PI_SUBAGENT_AGENT: "worker" } as NodeJS.ProcessEnv), true);
+  assert.equal(isSubagentSession({ PI_SUBAGENT_DEPTH: "2" } as NodeJS.ProcessEnv), true);
+  assert.equal(isSubagentSession({} as NodeJS.ProcessEnv), false);
+  const now = Date.parse("2026-09-30T12:00:00Z");
+  assert.equal(npmCheckDue(undefined, now), true);
+  assert.equal(npmCheckDue("not-a-date", now), true);
+  assert.equal(npmCheckDue("2026-09-30T11:00:00Z", now), false);
+  assert.equal(npmCheckDue("2026-09-30T05:00:00Z", now), true);
 });
 
 test("versioned npm specs resolve to the installed package name", () => {

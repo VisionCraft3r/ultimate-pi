@@ -20,6 +20,15 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     after: "4d05e91ce9b1de36c1289a70a40db91407bf284d93c6c9a2ae9501166dec3b24",
   },
   {
+    name: "pi-graft",
+    version: "0.1.2",
+    root: "npm/node_modules/pi-graft",
+    target: "extensions/graft.ts",
+    patch: "pi-graft-async-0.1.2.patch",
+    before: "663479e235ac247211f64e5d6015995d8cff04e33726fc639eaa0b1edfe5e6bb",
+    after: "11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e",
+  },
+  {
     name: "pi-interactive-subagents",
     version: "3.7.2",
     root: "git/github.com/amosblomqvist/pi-interactive-subagents",

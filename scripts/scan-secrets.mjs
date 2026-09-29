@@ -34,6 +34,8 @@ const ALLOWED_BARE_HEX = new Set([
   publicHex("4d05e91ce9b1de36c1289a70a40db914", "07bf284d93c6c9a2ae9501166dec3b24"),
   publicHex("2f8ef422f668e7e8fddfe084f37ebe6e", "e44865ce32c2a981a765bb6c213b2c61"),
   publicHex("e37f908e912ade6eebfc4048e7bc7189", "8597f89f630da9f5c2fca1dd1db45324"),
+  publicHex("663479e235ac247211f64e5d6015995d", "8cff04e33726fc639eaa0b1edfe5e6bb"),
+  publicHex("11502aa5ae65d8b0a8a852c5903fe029", "82e812e3f1b64d3d1eb4bf458f1ec78e"),
 ]);
 
 // Paperclip skill identifiers used as `key: "..."` in test fixtures. They look

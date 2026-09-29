@@ -15,7 +15,23 @@ import { copyExtensionTree } from "./extension-layout.ts";
 
 const PATCH_PINS: Record<string, string> = {
   "@schultzp2020/pi-cursor": "0.5.2",
+  "pi-graft": "0.1.2",
 };
+
+/** How long a parent session waits before asking npm for package versions again. */
+export const NPM_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+export function isSubagentSession(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.PI_SUBAGENT_AGENT?.trim()) return true;
+  return Number(env.PI_SUBAGENT_DEPTH ?? "0") >= 1;
+}
+
+export function npmCheckDue(checkedAt: unknown, now = Date.now()): boolean {
+  if (typeof checkedAt !== "string" || !checkedAt) return true;
+  const then = Date.parse(checkedAt);
+  if (!Number.isFinite(then)) return true;
+  return now - then >= NPM_CHECK_INTERVAL_MS;
+}
 
 const SYNC_DIRS = ["extensions", "lib", "templates", "skills", "patches"];
 
@@ -255,7 +271,8 @@ async function syncSource(dir: string, options: { skipTests: boolean }): Promise
     }
   }
   const skipped = copySource(source, dir);
-  writeFileSync(statePath, `${JSON.stringify({ hash: next, at: new Date().toISOString() }, null, 2)}\n`);
+  const previous = readJson(statePath) ?? {};
+  writeFileSync(statePath, `${JSON.stringify({ ...previous, hash: next, at: new Date().toISOString() }, null, 2)}\n`);
   const note = "synced Ultimate PI checkout into the agent dir";
   if (skipped.length === 0) return note;
   return `${note}; left non-factory files out of extensions/: ${skipped.join(", ")}`;
@@ -310,6 +327,7 @@ async function updateNpmPackages(dir: string): Promise<string[]> {
 }
 
 export async function runLaunchUpdate(options: { skipNetwork?: boolean; skipTests?: boolean } = {}): Promise<string[]> {
+  if (isSubagentSession()) return ["skipped launch update in a subagent"];
   const dir = agentDir();
   mkdirSync(dir, { recursive: true });
   const lock = join(dir, "ultimate-pi-launch.lock");
@@ -320,7 +338,15 @@ export async function runLaunchUpdate(options: { skipNetwork?: boolean; skipTest
   writeFileSync(lock, String(process.pid));
   try {
     const notes = [await syncSource(dir, { skipTests: options.skipTests === true })];
-    if (!options.skipNetwork) notes.push(...(await updateNpmPackages(dir)));
+    if (!options.skipNetwork) {
+      const statePath = join(dir, "ultimate-pi-launch.json");
+      const state = readJson(statePath);
+      if (npmCheckDue(state?.checkedAt)) {
+        notes.push(...(await updateNpmPackages(dir)));
+        const current = readJson(statePath) ?? {};
+        writeFileSync(statePath, `${JSON.stringify({ ...current, checkedAt: new Date().toISOString() }, null, 2)}\n`);
+      }
+    }
     return notes.filter((note) => note.length > 0);
   } finally {
     try {
