@@ -15,6 +15,9 @@ const OPTIONAL_PACKAGES = [
   { value: "npm:pi-cache-graph", label: "pi-cache-graph" },
 ];
 
+/** Not in OPTIONAL_PACKAGES: --yes must not download it. */
+export const BMAD_PACKAGE = "git:github.com/VisionCraft3r/ultimate-pi-bmad";
+
 const REQUIRED_PACKAGES = [
   "git:github.com/amosblomqvist/pi-interactive-subagents@c3e8b53c0754ae5ccc19fdab5a7481ec039bc2f7",
   "npm:pi-lens",
@@ -225,7 +228,19 @@ export async function configurePackagesAndKeys(
     );
   }
 
+  let installBmad =
+    Array.isArray(answers.packages) && answers.packages.includes(BMAD_PACKAGE);
+  if (!Array.isArray(answers.packages) && !options.yes && !options.dryRun) {
+    installBmad = isCancelled(
+      await p.confirm({
+        message: "Install the BMAD bridge? Only if this machine uses BMAD.",
+        initialValue: false,
+      }),
+    );
+  }
+
   const packages = [selfSpec(options), ...REQUIRED_PACKAGES, ...optionalChosen];
+  if (installBmad && !packages.includes(BMAD_PACKAGE)) packages.push(BMAD_PACKAGE);
   if (deepseekKey) packages.push("git:github.com/amosblomqvist/pi-observational-memory");
   if (ids.includes("anthropic")) packages.push("npm:@gotgenes/pi-anthropic-auth");
   if (ids.includes("cursor")) packages.push("npm:@schultzp2020/pi-cursor");

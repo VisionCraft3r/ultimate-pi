@@ -139,7 +139,7 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
    a local heuristic fallback if you skip it.
 6. **Observational memory** (optional) — a DeepSeek key to enable a lightweight
    session observer/consolidator.
-7. **Packages** — required pi-lens, pi-graft, `@spences10/pi-themes`, pi-context-view, and `@lucascardozo/pi-edit-guard`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset.
+7. **Packages** — required pi-lens, pi-graft, `@spences10/pi-themes`, pi-context-view, and `@lucascardozo/pi-edit-guard`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset. A separate question asks whether to install the BMAD bridge (`git:github.com/VisionCraft3r/ultimate-pi-bmad`). The default is no, and `--yes` does not select it.
 8. **Apply** — installs packages, merges `settings.json`, `auth.json`, and
    (for a local endpoint) `models.json`, with timestamped backups, and splices
    the routing doc into `AGENTS.md` between marker comments.

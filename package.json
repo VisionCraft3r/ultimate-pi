@@ -23,7 +23,6 @@
       "./extensions/ask-user-question.ts",
       "./extensions/scout-budget.ts",
       "./extensions/qa-budget.ts",
-      "./extensions/bmad-bridge.ts",
       "./extensions/launch-update.ts",
       "./extensions/bash-guard/index.ts",
       "./extensions/browser/index.ts",

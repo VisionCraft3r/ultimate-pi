@@ -25,12 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Child thinking flag.** Subagents pass `--thinking` separately. The level is not glued onto the model id.
 - **QA tool-round ceiling.** `qa_tester` stops after 20 tool rounds and must return pass or fail and the failing step.
 - **`.pi/invariants.md`.** The planner reads it when it exists. Planner and worker append one line only for a repo-wide rule the next story would get wrong.
-- **BMAD project choice.** A v6 tree (`_bmad` plus `.agents/skills/bmad-agent-*`) asks once: BMAD agents, or Ultimate PI agents. The answer is `{project}/.pi/agent-system`. Ultimate PI mode folds persona principles into the existing roles and still routes with `jev_triage`. A planner brief gets one planning persona. A story under `implementation_artifacts` that already names files skips scout. BMAD mode loads `.agents/skills` and does not remap that work onto the five roles. An older v6 install can run `bmad-method` quick-update; `_bmad/custom/` is hashed before and after. A decline is remembered per latest version. A non-v6 tree is not migrated.
+- **BMAD project choice** is a separate package, `git:github.com/VisionCraft3r/ultimate-pi-bmad`. It is not part of a default install. Install asks on its own, the default is no, and `--yes` does not select it. `answers.packages` can name the spec. `ultimate-pi setup packages` can add it later. When installed, a v6 tree (`_bmad` plus `.agents/skills/bmad-agent-*`) asks once: BMAD agents, or Ultimate PI agents. The answer is `{project}/.pi/agent-system`. Ultimate PI mode folds persona principles into the existing roles and still routes with `jev_triage`. A planner brief gets one planning persona. A story under `implementation_artifacts` that already names files skips scout. BMAD mode loads `.agents/skills` and does not remap that work onto the five roles. An older v6 install can run `bmad-method` quick-update; `_bmad/custom/` is hashed before and after. A decline is remembered per latest version. A non-v6 tree is not migrated.
 - **`pi-context-view`** is required. Parent-only `/context`. It adds no model instructions.
 - **`@lucascardozo/pi-edit-guard`** is required and loads only on child agents that already have `edit` or `write`.
 
 ### Removed
 
+- **BMAD bridge from this package.** `extensions/bmad-bridge.ts` and its helpers are no longer shipped with Ultimate PI. They live in `ultimate-pi-bmad` and are installed only when chosen.
 - **`video-ads` role.** Install no longer writes that profile or routes video-ad work to it. An existing local `agents/video-ads.md` is left in place.
 
 ### Security

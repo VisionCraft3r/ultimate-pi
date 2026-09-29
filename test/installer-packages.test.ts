@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { configurePackagesAndKeys, assertGitAvailableForSpecs, gitMissingMessage } from "../installer/packages.mjs";
+import { BMAD_PACKAGE, configurePackagesAndKeys, assertGitAvailableForSpecs, gitMissingMessage } from "../installer/packages.mjs";
 import { ensureEditGuardChildGate } from "../installer/edit-guard-child.mjs";
 import { ensureScoutChildLaunch, ensureScoutToolDiet, ensureSeparateThinkingFlag } from "../installer/scout-child.mjs";
 import { doctor } from "../installer/doctor.mjs";
@@ -47,6 +47,25 @@ test("offline --yes with empty answers.packages still installs required lens, gr
   assert.equal(overlap.packages.filter((spec) => spec === "npm:pi-lens").length, 1);
   assert.equal(overlap.packages.filter((spec) => spec === "npm:pi-graft").length, 1);
   assert.equal(overlap.packages.filter((spec) => spec === SUBAGENTS).length, 1);
+});
+
+test("--yes does not install the BMAD bridge unless answers.packages names it", async () => {
+  const skipped = await configurePackagesAndKeys({
+    offline: true,
+    yes: true,
+  });
+  assert.equal(skipped.packages.includes(BMAD_PACKAGE), false);
+  assert.equal(BMAD_PACKAGE, "git:github.com/VisionCraft3r/ultimate-pi-bmad");
+  assert.ok(skipped.packages.includes("npm:@plannotator/pi-extension"));
+  assert.ok(skipped.packages.includes("npm:pi-cache-graph"));
+
+  const chosen = await configurePackagesAndKeys({
+    offline: true,
+    yes: true,
+    answers: { packages: [BMAD_PACKAGE] },
+  });
+  assert.ok(chosen.packages.includes(BMAD_PACKAGE));
+  assert.equal(chosen.packages.filter((spec) => spec === BMAD_PACKAGE).length, 1);
 });
 
 test("rejects bare answers.packages names before any pi install", async () => {

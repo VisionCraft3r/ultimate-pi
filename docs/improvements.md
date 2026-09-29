@@ -48,6 +48,8 @@ bash-guard wraps every bash command it allows. Background pids still in the shel
 
 ## BMAD projects
 
+The BMAD bridge is optional and is not part of a default install. Install asks after the other optional packages: "Install the BMAD bridge? Only if this machine uses BMAD." The default is no, and `--yes` does not select it. A yes installs `git:github.com/VisionCraft3r/ultimate-pi-bmad` and nothing else downloads that tree. `answers.packages` can name that spec. `ultimate-pi setup packages` can add it later.
+
 A v6 install is detected from `_bmad` and `.agents/skills/bmad-agent-*`. The first interactive session asks once: BMAD agents, or Ultimate PI agents. The answer is stored in `{project}/.pi/agent-system` and changes only when you ask, including `/agent-system`.
 
 Ultimate PI mode still calls `jev_triage`. Personas are a short card: name, role, and at most five principles. The planner brief gets one of them (architect, ux-designer, pm, or sm) matching the ask. If a story under `implementation_artifacts` already names files, that list is the map and scout is not spawned. Models stay the five roles from install. They are not asked again.

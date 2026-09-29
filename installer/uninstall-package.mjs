@@ -19,6 +19,7 @@ export const ULTIMATE_PI_THIRD_PARTY_PREFIXES = [
   "npm:@lucascardozo/pi-edit-guard",
   "npm:@plannotator/pi-extension",
   "npm:pi-cache-graph",
+  "git:github.com/VisionCraft3r/ultimate-pi-bmad",
   "npm:@gotgenes/pi-anthropic-auth",
   "npm:@schultzp2020/pi-cursor",
 ];
