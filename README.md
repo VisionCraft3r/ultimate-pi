@@ -174,7 +174,7 @@ See [docs/providers.md](./docs/providers.md) for a per-provider walkthrough.
 | `planner` | architecture breakdowns; `handoff_spec` opens the spec in Plannotator |
 | `researcher` | web research, external docs |
 | `qa_tester` | drives a live browser/UI |
-| `reviewer` | read-only verdict after a worker wave, and on a code or project audit |
+| `reviewer` | read-only verdict when triage says `Verification: reviewer`, and on a code or project audit |
 
 Ultimate Pi does not install a video-ad role. A profile already at
 `agents/video-ads.md` is left in place. The next `ultimate-pi setup agents`
@@ -240,8 +240,9 @@ in this repository and is not covered by Ultimate Pi's MIT license — you bring
 your own OpenRouter API key with access to the model. Without a key, JEV falls
 back to a local keyword heuristic and prints a visible
 `⚠ JEV not configured` warning. Override the model/endpoint with
-`ULTIMATE_PI_JEV_MODEL` / `ULTIMATE_PI_JEV_ENDPOINT`. See
-[docs/jev.md](./docs/jev.md) for details.
+`ULTIMATE_PI_JEV_MODEL` / `ULTIMATE_PI_JEV_ENDPOINT`. A live call gives up after
+`ULTIMATE_PI_JEV_TIMEOUT_MS` (default 8 seconds) and falls through to the
+heuristic. See [docs/jev.md](./docs/jev.md) for details.
 
 ## Architecture overview
 
@@ -255,7 +256,7 @@ flowchart LR
     J -->|tier_3| P[planner] --> W
     J -->|tier_4_qa| Q[qa_tester]
     J -->|tier_5_review| Rev[reviewer]
-    W --> Rev
+    W -.->|"Verification: reviewer"| Rev
     W --> T[tmux pane]
     S --> T
     P --> T
@@ -300,9 +301,12 @@ recorded pid and its children), `/context` (parent session), `/browser`,
 `/snippets`, `/builtin-header`, and `/cache` / `/om` if those optional
 packages are installed.
 
-On session start, `launch-update` applies patch and minor npm updates that
-stay on known pins, and copies a newer checkout from `ULTIMATE_PI_ROOT` only
-after that checkout's tests pass. Major bumps stay put.
+After the prompt is up, `launch-update` applies patch and minor npm updates
+that stay on known pins, and copies a newer checkout from `ULTIMATE_PI_ROOT`
+only after that checkout's tests pass. Version checks run four at a time.
+Installs stay one at a time. Major bumps stay put. Playwright and the HTML/PDF
+converters load on first use, not at startup. The daily Cursor catalog scan
+does not hold the prompt. `/ModelAgents` "Scan now" still waits for it.
 
 ## Security & privacy
 
@@ -332,8 +336,9 @@ and inspiration that helped shape this project.
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for dev setup, running
-`npm test` / `npm run scan`, and commit conventions. Never commit API keys or
-`auth.json`.
+`npm test` / `npm run scan`, and commit conventions. `npm run measure:startup`
+times extension import and `session_start` without calling a model or the
+network. Never commit API keys or `auth.json`.
 
 ## License
 

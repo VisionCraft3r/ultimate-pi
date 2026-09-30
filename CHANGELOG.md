@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Extension changes apply on `/reload`. The managed routing block and agent profiles update through `ultimate-pi setup agents`, not from a package update alone.
 
+### Changed
+
+- **Faster launch.** Playwright loads on the first browser tool or `/browser on`. HTML and PDF converters load on the first conversion. The Cursor catalog scan no longer makes startup wait; `/ModelAgents` "Scan now" still waits. The checkout hash and npm version checks run on the next turn, and `npm view` runs four at a time. Installs stay one at a time.
+
+  `npm run measure:startup` (median of 5, each extension in a fresh process, network stubbed): browser 322.6 ms to 108.5 ms, web fetch 179.4 ms to 111.7 ms, launch-update session start 6.9 ms to 0.1 ms, model-agents session start 2.4 ms to 0.7 ms and it no longer returns a promise. Sum of those medians 2670.9 ms to 2468.2 ms. A real Pi launch reached the header in 1.720 s, 1.714 s, and 1.711 s before this copy (median 1.714 s), and in 1.722 s, 1.529 s, and 1.485 s after (median 1.529 s).
+
 - **`reviewer` role.** Read-only sixth agent with its own model assignment. `tier_1`, `tier_2`, and `tier_3` keep their current first role, then one reviewer covers the worker wave. `tier_5_review` is a JEV noul for a code audit, project audit, security review, or PR/diff review and starts with the reviewer. Blocking findings on an implementation tier repair for up to two rounds. An audit that only asks for findings stops at the report. Existing installs get `agents/reviewer.md` from `ultimate-pi setup agents` or a new install, not from a package update alone. An answers file that omits `reviewer` copies the planner assignment into a separate entry.
 
 ## [1.1.0-alpha] — 2026-09-28

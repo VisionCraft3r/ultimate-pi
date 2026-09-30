@@ -20,8 +20,9 @@ Run these locally before opening a PR. All of them must pass.
 | --- | --- |
 | `npm test` | Runs `node:test` files under `test/` |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run scan` | `scripts/scan-secrets.mjs` then `scripts/scan-personal.mjs` |
+| `npm run scan` | Secret scan, personal-string scan, and the managed routing-block byte budget |
 | `npm run smoke` | Installer dry-run smoke test |
+| `npm run measure:startup` | Optional. Median import and `session_start` time per extension. No model or network calls |
 
 `npm run scan` **must pass before any commit**. It is the last line of defense against secrets and personal strings landing in the public tree.
 

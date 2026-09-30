@@ -37,15 +37,19 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import {
-  chromium,
-  type BrowserContext,
-  type Page,
-  type ConsoleMessage,
-  type Request,
-} from "playwright-core";
+import type { BrowserContext, ConsoleMessage, Page, Request } from "playwright-core";
 import { getAgentDir } from "../../lib/agent-dir.ts";
 import { presentCapped } from "../../lib/output-cap.ts";
+
+type Chromium = typeof import("playwright-core").chromium;
+
+let chromiumLoader: Promise<Chromium> | undefined;
+
+/** Playwright stays off the startup path until a browser tool or /browser on. */
+function loadChromium(): Promise<Chromium> {
+  chromiumLoader ??= import("playwright-core").then((mod) => mod.chromium);
+  return chromiumLoader;
+}
 
 type ConsoleEntry = {
   ts: number;
@@ -164,6 +168,7 @@ export default function browserExtension(pi: ExtensionAPI) {
   async function ensurePage(): Promise<Page> {
     if (page && !page.isClosed()) return page;
 
+    const chromium = await loadChromium();
     if (!context) {
       context = await chromium.launchPersistentContext(profileDir, {
         headless,
@@ -252,6 +257,7 @@ export default function browserExtension(pi: ExtensionAPI) {
 
   async function enable(): Promise<void> {
     setEnabled(true);
+    void loadChromium();
     pi.appendEntry(ENABLED_ENTRY_TYPE, { on: true });
   }
 
@@ -272,13 +278,15 @@ export default function browserExtension(pi: ExtensionAPI) {
   // browser-enabled custom entry wins. Survives /reload (the same session
   // replays its entries when the extension re-inits) but not /new (fresh
   // session has no entries, so we default to off).
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", (_event, ctx) => {
+    const entries = ctx.sessionManager.getEntries();
     let want = true;
-    for (const entry of ctx.sessionManager.getEntries()) {
-      if (entry.type === "custom" && entry.customType === ENABLED_ENTRY_TYPE) {
-        const data = entry.data as { on?: boolean } | undefined;
-        if (data && typeof data.on === "boolean") want = data.on;
-      }
+    for (let i = entries.length - 1; i >= 0; i -= 1) {
+      const entry = entries[i];
+      if (entry.type !== "custom" || entry.customType !== ENABLED_ENTRY_TYPE) continue;
+      const data = entry.data as { on?: boolean } | undefined;
+      if (data && typeof data.on === "boolean") want = data.on;
+      break;
     }
     setEnabled(want);
   });

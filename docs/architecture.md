@@ -35,7 +35,7 @@ Every request hits `jev_triage` first. The classifier returns a tier; the orches
 | `planner` | `tier_3` | Architecture breakdowns; emits a spec via `handoff_spec` |
 | `researcher` | orchestrator decision (external docs / web) | Web research, third-party docs |
 | `qa_tester` | `tier_4_qa` | Drives a live browser/UI |
-| `reviewer` | after a worker wave; `tier_5_review` | Read-only verdict. Own model. No writes |
+| `reviewer` | `Verification: reviewer` after a worker wave, or `tier_5_review` | Read-only verdict. Own model. No writes |
 
 `tier_4_qa` is composed from a UI-likelihood threshold (`noul ≥ 0.75`) and a confidence threshold (`≥ 0.7`). `tier_5_review` is a separate `is_code_review` noul with the same thresholds. Low-confidence results (below 70% for `tier_3` / `tier_4_qa` / `tier_5_review`, below 50% otherwise) are flagged rather than treated as a hard route. Without an OpenRouter key, triage falls back to a local keyword heuristic and prints `⚠ JEV not configured`.
 
@@ -56,7 +56,7 @@ flowchart TB
     J -->|tier_4_qa live UI| Q[qa_tester]
     J -->|tier_5_review audit| Rev[reviewer]
     O -->|external docs needed| R[researcher]
-    W --> Rev
+    W -.->|"Verification: reviewer"| Rev
 
     subgraph tmux ["tmux panes via pi-interactive-subagents"]
         S

@@ -74,7 +74,7 @@ Scout launches with `--no-lens-context`, and pi-lens is not attached to that chi
 
 ## Launch update
 
-`launch-update` runs once per session. It can apply patch and minor npm updates that stay on known pins, and it can copy a newer Ultimate Pi checkout into the agent directory only after that checkout's tests pass. Set `ULTIMATE_PI_ROOT` to the checkout. Helpers that are not extension factories are not copied into `extensions/`.
+`launch-update` runs once per parent session, after the prompt is up. It can apply patch and minor npm updates that stay on known pins. `npm view` runs four at a time, and installs stay one at a time. It can copy a newer Ultimate Pi checkout into the agent directory only after that checkout's tests pass. Set `ULTIMATE_PI_ROOT` to the checkout. Helpers that are not extension factories are not copied into `extensions/`. Playwright and the HTML/PDF converters load on first use. The daily Cursor catalog scan does not hold the prompt.
 
 ## Left on the maintainer machine
 

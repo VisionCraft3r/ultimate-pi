@@ -66,7 +66,7 @@ async function load(url: string, signal?: AbortSignal, usedJina = false): Promis
 		ctype.includes("text/html") || ctype.includes("application/xhtml") || /<(?:html|body|article)[\s>]/i.test(raw);
 	if (!isHtml) return raw.trim();
 
-	const markdown = htmlToMarkdown(raw, url);
+	const markdown = await htmlToMarkdown(raw, url);
 	if (!usedJina && markdown.trim().length < MIN_CONTENT && !url.startsWith(JINA)) {
 		try {
 			return await load(`${JINA}${url}`, signal, true);

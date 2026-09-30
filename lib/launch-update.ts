@@ -21,6 +21,30 @@ const PATCH_PINS: Record<string, string> = {
 /** How long a parent session waits before asking npm for package versions again. */
 export const NPM_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
+/** How many `npm view` calls run at once. Installs stay one at a time. */
+export const NPM_VIEW_CONCURRENCY = 4;
+
+export async function mapWithCap<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const cap = Math.max(1, Math.min(items.length, Math.floor(limit)));
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    for (;;) {
+      const index = next;
+      next += 1;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index] as T, index);
+    }
+  };
+  await Promise.all(Array.from({ length: cap }, () => worker()));
+  return results;
+}
+
 export function isSubagentSession(env: NodeJS.ProcessEnv = process.env): boolean {
   if (env.PI_SUBAGENT_AGENT?.trim()) return true;
   return Number(env.PI_SUBAGENT_DEPTH ?? "0") >= 1;
@@ -283,47 +307,54 @@ async function updateNpmPackages(dir: string): Promise<string[]> {
   const packages = Array.isArray(settings?.packages) ? settings.packages.filter((item): item is string => typeof item === "string") : [];
   const versionCli = piCliInvocation(["--version"]);
   const piVersion = parsePiVersion((await run(versionCli.command, versionCli.args, undefined, 10000)).stdout);
-  const notes: string[] = [];
-  for (const spec of packages) {
+  const notes: Array<string | undefined> = packages.map(() => undefined);
+  const pending: Array<{ index: number; name: string; current: string }> = [];
+  for (let index = 0; index < packages.length; index += 1) {
+    const spec = packages[index] ?? "";
     const name = npmPackageName(spec);
     if (!name) {
       const note = nonNpmPackageNote(dir, spec);
-      if (note) notes.push(note);
+      if (note) notes[index] = note;
       continue;
     }
     const current = installedVersion(dir, name);
     if (!current) {
-      notes.push(`skipped ${name}; not installed`);
+      notes[index] = `skipped ${name}; not installed`;
       continue;
     }
     if (!plannotatorUpdateAllowed(name, piVersion)) {
-      notes.push(`held ${name}; Pi ${piVersion ?? "unknown"} is below 0.79.1`);
+      notes[index] = `held ${name}; Pi ${piVersion ?? "unknown"} is below 0.79.1`;
       continue;
     }
-    const viewed = await run("npm", ["view", name, "version"], undefined, 15000);
-    const latest = viewed.stdout.trim().replaceAll('"', "");
-    const decision = classifyNpmUpdate(current, latest, name);
+    pending.push({ index, name, current });
+  }
+  const viewed = await mapWithCap(pending, NPM_VIEW_CONCURRENCY, async (item) => {
+    const result = await run("npm", ["view", item.name, "version"], undefined, 15000);
+    return { ...item, latest: result.stdout.trim().replaceAll('"', "") };
+  });
+  for (const item of viewed) {
+    const decision = classifyNpmUpdate(item.current, item.latest, item.name);
     if (decision === "current") continue;
     if (decision === "skip-major") {
-      notes.push(`held ${name} ${current} -> ${latest}; major updates are not applied automatically`);
+      notes[item.index] = `held ${item.name} ${item.current} -> ${item.latest}; major updates are not applied automatically`;
       continue;
     }
     if (decision === "skip-patch-pin") {
-      notes.push(`held ${name} at ${current}; ${latest} would drop the patched pin ${PATCH_PINS[name]}`);
+      notes[item.index] = `held ${item.name} at ${item.current}; ${item.latest} would drop the patched pin ${PATCH_PINS[item.name]}`;
       continue;
     }
-    const installCli = piCliInvocation(["install", `npm:${name}@${latest}`]);
+    const installCli = piCliInvocation(["install", `npm:${item.name}@${item.latest}`]);
     const installed = await run(installCli.command, installCli.args, dir, 60000);
-    const after = installedVersion(dir, name);
-    if (installed.code !== 0 || after !== latest) {
-      const revertCli = piCliInvocation(["install", `npm:${name}@${current}`]);
+    const after = installedVersion(dir, item.name);
+    if (installed.code !== 0 || after !== item.latest) {
+      const revertCli = piCliInvocation(["install", `npm:${item.name}@${item.current}`]);
       await run(revertCli.command, revertCli.args, dir, 60000);
-      notes.push(`reverted ${name}; update to ${latest} did not install cleanly`);
+      notes[item.index] = `reverted ${item.name}; update to ${item.latest} did not install cleanly`;
       continue;
     }
-    notes.push(`updated ${name} ${current} -> ${latest}`);
+    notes[item.index] = `updated ${item.name} ${item.current} -> ${item.latest}`;
   }
-  return notes;
+  return notes.filter((note): note is string => Boolean(note));
 }
 
 export async function runLaunchUpdate(options: { skipNetwork?: boolean; skipTests?: boolean } = {}): Promise<string[]> {

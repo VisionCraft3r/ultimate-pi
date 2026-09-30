@@ -23,6 +23,8 @@ The same requirement is listed in the top-level [README](../../README.md#require
 
 Then `/reload` inside pi (or restart). The tools (`browser_goto`,
 `browser_eval`, …) appear in `pi.getAllTools()` when this extension is loaded.
+Playwright itself loads on the first `browser_*` call or `/browser on`, not
+when Pi starts.
 
 ## Default on, opt out per session
 

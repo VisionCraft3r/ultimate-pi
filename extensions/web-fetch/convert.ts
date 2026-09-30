@@ -1,13 +1,30 @@
-import { Readability } from "@mozilla/readability";
-import { parseHTML } from "linkedom";
-import TurndownService from "turndown";
-import { extractText } from "unpdf";
+type HtmlDeps = {
+	Readability: typeof import("@mozilla/readability").Readability;
+	parseHTML: typeof import("linkedom").parseHTML;
+	turndown: { turndown: (html: string) => string };
+};
 
-const turndown = new TurndownService({
-	headingStyle: "atx",
-	codeBlockStyle: "fenced",
-	bulletListMarker: "-",
-});
+let htmlDeps: Promise<HtmlDeps> | undefined;
+let extractTextLoader: Promise<typeof import("unpdf").extractText> | undefined;
+
+/** Readability, linkedom, and Turndown load on the first HTML conversion. */
+function loadHtmlDeps(): Promise<HtmlDeps> {
+	htmlDeps ??= (async () => {
+		const [{ Readability }, { parseHTML }, turndownMod] = await Promise.all([
+			import("@mozilla/readability"),
+			import("linkedom"),
+			import("turndown"),
+		]);
+		const TurndownService = turndownMod.default;
+		const turndown = new TurndownService({
+			headingStyle: "atx",
+			codeBlockStyle: "fenced",
+			bulletListMarker: "-",
+		});
+		return { Readability, parseHTML, turndown };
+	})();
+	return htmlDeps;
+}
 
 function withBaseUrl(
 	document: {
@@ -27,7 +44,8 @@ function withBaseUrl(
 }
 
 /** Extract readable article HTML and convert it to Markdown. */
-export function htmlToMarkdown(html: string, url: string): string {
+export async function htmlToMarkdown(html: string, url: string): Promise<string> {
+	const { Readability, parseHTML, turndown } = await loadHtmlDeps();
 	const { document } = parseHTML(String(html ?? ""));
 	withBaseUrl(document, url);
 
@@ -56,6 +74,8 @@ export function htmlToMarkdown(html: string, url: string): string {
 
 /** Extract text from a PDF and return it as Markdown-friendly plain text. */
 export async function pdfToMarkdown(bytes: Uint8Array): Promise<string> {
+	extractTextLoader ??= import("unpdf").then((mod) => mod.extractText);
+	const extractText = await extractTextLoader;
 	const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayBuffer);
 	const { text } = await extractText(data, { mergePages: true });
 	const pages = Array.isArray(text) ? text : [String(text ?? "")];

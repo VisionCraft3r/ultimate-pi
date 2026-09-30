@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyNpmUpdate, copySource, gitCheckoutDir, isSubagentSession, nonNpmPackageNote, npmCheckDue, npmPackageName, parsePiVersion, plannotatorUpdateAllowed, versionAtLeast } from "../lib/launch-update.ts";
+import { classifyNpmUpdate, copySource, gitCheckoutDir, isSubagentSession, mapWithCap, nonNpmPackageNote, npmCheckDue, npmPackageName, parsePiVersion, plannotatorUpdateAllowed, versionAtLeast } from "../lib/launch-update.ts";
 import { copyExtensionTree, isExtensionFactorySource, unsafeExtensionEntries } from "../lib/extension-layout.ts";
 import { formatAnswers, formatSidecarQuestion, paperclipEnv, parseSubagentQuestion, questionsFromAsk } from "../lib/paperclip-questions.ts";
 import { writeAskSidecar } from "../lib/planner-handoff.ts";
@@ -18,6 +18,22 @@ test("npm updates skip majors and patched pins", () => {
   assert.equal(versionAtLeast("0.87.1", "0.79.1"), true);
   assert.equal(plannotatorUpdateAllowed("@plannotator/pi-extension", "0.70.0"), false);
   assert.equal(plannotatorUpdateAllowed("pi-lens", "0.70.0"), true);
+});
+
+test("mapWithCap keeps result order and limits how many run at once", async () => {
+  let active = 0;
+  let max = 0;
+  const out = await mapWithCap([1, 2, 3, 4, 5, 6, 7], 4, async (n) => {
+    active += 1;
+    max = Math.max(max, active);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    active -= 1;
+    return n * 2;
+  });
+  assert.deepEqual(out, [2, 4, 6, 8, 10, 12, 14]);
+  assert.equal(max <= 4, true);
+  assert.equal(max > 1, true);
+  assert.deepEqual(await mapWithCap([], 4, async (n: number) => n), []);
 });
 
 test("subagent sessions skip launch update and npm checks wait six hours", () => {

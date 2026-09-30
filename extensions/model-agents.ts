@@ -151,14 +151,14 @@ async function runScan(ctx: ExtensionContext, force: boolean): Promise<void> {
 }
 
 export default function modelAgents(pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", (_event, ctx) => {
     if (process.env.PI_SUBAGENT_AGENT || Number(process.env.PI_SUBAGENT_DEPTH ?? "0") >= 1) return;
     if (!cursorScanAvailable()) return;
-    try {
-      await runScan(ctx, false);
-    } catch {
+    // Do not return this promise. Pi awaits session_start, and the catalog
+    // POST can sit until its 30s timeout. /ModelAgents "Scan now" still awaits.
+    void runScan(ctx, false).catch(() => {
       // proxy or disk trouble must not block startup; next session retries
-    }
+    });
   });
 
   pi.registerCommand("ModelAgents", {

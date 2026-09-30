@@ -84,6 +84,7 @@
     "test": "node scripts/run-tests.mjs",
     "typecheck": "tsc --noEmit",
     "scan": "node scripts/scan-secrets.mjs && node scripts/scan-personal.mjs && node scripts/check-context-budget.mjs",
+    "measure:startup": "node scripts/measure-startup.mjs",
     "smoke": "node scripts/smoke-install.mjs"
   }
 }
