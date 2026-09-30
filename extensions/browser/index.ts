@@ -45,6 +45,7 @@ import {
   type Request,
 } from "playwright-core";
 import { getAgentDir } from "../../lib/agent-dir.ts";
+import { presentCapped } from "../../lib/output-cap.ts";
 
 type ConsoleEntry = {
   ts: number;
@@ -417,7 +418,7 @@ export default function browserExtension(pi: ExtensionAPI) {
                 `[${new Date(e.ts).toISOString()}] ${e.type}: ${e.text}${e.location ? `  @ ${e.location}` : ""}`,
             )
             .join("\n") || "(empty)";
-        return { content: [{ type: "text", text }], details: { entries: out } };
+        return { content: [{ type: "text", text: presentCapped(text) }], details: { entries: out } };
       });
     },
   });
@@ -486,7 +487,7 @@ export default function browserExtension(pi: ExtensionAPI) {
           }
         }
         const text = lines.join("\n") || "(empty)";
-        return { content: [{ type: "text", text }], details: { entries: out } };
+        return { content: [{ type: "text", text: presentCapped(text) }], details: { entries: out } };
       });
     },
   });

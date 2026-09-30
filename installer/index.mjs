@@ -12,6 +12,7 @@ import { mergeModelsJson } from "./models-json.mjs";
 import { applySettings } from "./settings.mjs";
 import { applyEnabledExtras, configureExtras } from "./extras.mjs";
 import { doctor } from "./doctor.mjs";
+import { runBashCheck } from "./bash-check.mjs";
 import { loadAnswers as loadAnswersFile } from "./answers.mjs";
 import { bindAgentDir } from "./pi-runtime.mjs";
 import { loadInstalledState } from "./load-installed-state.mjs";
@@ -314,6 +315,8 @@ export async function dispatch(options) {
       return setup(options);
     case "doctor":
       return runDoctor(options);
+    case "bash-check":
+      return runBashCheck(options);
     case "uninstall":
       return uninstall(options);
     default:

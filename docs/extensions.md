@@ -8,9 +8,9 @@ Commands below are typed inside a Pi session.
 
 ### `jev-triage`
 
-Classifies the user's exact wording into `tier_0` … `tier_5_review`. Attaches the previous user turn for short continuations and skips re-triage of ship/continue crumbs. With an OpenRouter key it calls Jev; otherwise it uses a local keyword heuristic and says so. `tier_4_qa` and `tier_5_review` are composed from separate noul questions so "click" and "review" do not steal a bug or a plan.
+Classifies the user's exact wording into `tier_0` … `tier_5_review` and a `Verification:` of `tests`, `scout`, `browser`, or `reviewer`. Attaches the previous user turn for short continuations and skips re-triage of ship/continue crumbs. With an OpenRouter key it calls Jev; otherwise it uses a local keyword heuristic and says so. `tier_4_qa` and `tier_5_review` are composed from separate noul questions so "click" and "review" do not steal a bug or a plan. The verification choice is ignored unless the tier is an implementation tier, and a weak answer stays on `tests`.
 
-Does not write code, invent file counts, or choose a model id.
+Does not write code, invent file counts, or choose a model id. A live call aborts after `ULTIMATE_PI_JEV_TIMEOUT_MS` (default 8000) or when the tool is cancelled, and routing falls through to the heuristic with `JEV unavailable (timeout)`.
 
 ### `jev-sentinel`
 
@@ -38,7 +38,9 @@ Gives the planner `handoff_spec` plus a silent-park `.ask` watchdog so a spec-re
 
 `/bash-guard` toggles the interactive Run/Abort prompt for risky shell commands in the main session. Subagents (`PI_SUBAGENT_DEPTH` ≥ 1) do not get that prompt: catastrophic patterns (`rm -r`, `sudo`, `curl|sh`, disk-wipe tools, and disguised one-liners) are hard-blocked. Disabling the interactive guard does not disable that floor.
 
-Does not allow a child to work around a block.
+Does not allow a child to work around a block. Three consecutive headless denials end the turn and tell the agent to return Status BLOCKED. An allowed command resets that count.
+
+The floor lives in `extensions/bash-guard/rules.ts` with a justification, a safer alternative, and examples. Optional `<agentDir>/bash-rules.json` may add `forbidden` or `prompt` rules, or `allow` rules whose examples are not already on the floor. A malformed file keeps the built-ins. `ultimate-pi bash-check "<command>" [--agent worker]` prints the decision JSON. `--agent` uses the headless floor.
 
 `/jobs` wraps every bash command bash-guard allows. If that command still has background processes in the shell job table when it exits, each pid is written under `<agentDir>/jobs/<pid>/`. A process that detaches out of that job table is not recorded. A command bash-guard blocks is not wrapped. `/jobs` lists the live pids. `/jobs kill <pid>` stops that pid and its children, and only if the pid is in the ledger. With a UI, `/jobs kill` and no pid opens a picker. The ledger is shared. Worker can start jobs because it has bash. qa_tester loads this command through `jev_sentinel` and has no bash tool, so it can kill a job the worker started and cannot start one. The parent session can do both.
 
@@ -49,6 +51,20 @@ Does not allow a child to work around a block.
 ### `launch-update`
 
 On session start, applies patch and minor npm updates that stay on known pins. Major bumps, and packages pinned to a patch (`@schultzp2020/pi-cursor`), are left in place. It also copies `extensions`, `lib`, `templates`, `skills`, and `patches` from a checkout named by `ULTIMATE_PI_ROOT` only after that checkout's tests pass. Extension files that do not export a factory are not copied. The extension does not assume a home-directory path.
+
+### `wave-diff`
+
+Parent-only `wave_diff`. `action: "mark"` records HEAD and the dirty set under `.pi/wave-mark.json`. `action: "diff"` returns a capped `git diff --stat` plus changed and new files since that mark. The orchestrator passes that diff to the reviewer. A worker does not get this tool.
+
+### `review-trace`
+
+Parent-only. When a message contains a reviewer JSON verdict, and tracing is on, the verdict is appended to the local routing trace. The parser in `lib/review-verdict.ts` fails closed: unparsable output is `NEEDS CHANGES`.
+
+### Routing trace
+
+Set `ULTIMATE_PI_TRACE=1`, or `"ultimatePiTrace": true` in `<agentDir>/settings.json`. Events append to `<agentDir>/traces/<session>.jsonl`. Nothing is uploaded. Prompt-like fields are a hash and a length unless `ULTIMATE_PI_TRACE_CONTENT=1`. Values that look like tokens or keys are redacted either way. `skills/analyze-sessions/scripts/routing.py` summarizes tiers, triage source, fallback hops, bash blocks, and review repairs.
+
+`web_fetch`, `browser_console`, and `browser_network` cap text that would otherwise enter the model. The full text is written beside the cap only when the current role has `read`. `researcher` and `qa_tester` see the truncation marker only. `browser_console` and `browser_network` already take `limit` and `filter`.
 
 ## Browser, web, and prompts
 

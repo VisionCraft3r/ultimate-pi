@@ -50,6 +50,8 @@ DONE | BLOCKED
 
 Do not report DONE without that command and its result. "Should work" is not verification.
 
+Before DONE, audit the brief. For each acceptance criterion, name the evidence (the command, the file, or the test output) that proves it. Weak, indirect, or missing evidence means keep working, or report BLOCKED. Do not shrink the task to the part that already passes.
+
 ## Risks
 None, or the residual risk.
 

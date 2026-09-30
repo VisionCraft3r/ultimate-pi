@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { htmlToMarkdown, pdfToMarkdown } from "./convert.ts";
+import { presentCapped } from "../../lib/output-cap.ts";
 
 export const USER_AGENT = "Mozilla/5.0 (compatible; ultimate-pi/1.0.0-alpha)";
 
@@ -32,7 +33,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId: string, { url }: { url: string }, signal?: AbortSignal) {
 			try {
-				return result(await load(url, signal));
+				return result(presentCapped(await load(url, signal)));
 			} catch (err) {
 				return result(asError(err));
 			}

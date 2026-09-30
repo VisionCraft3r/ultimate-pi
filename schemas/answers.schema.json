@@ -1,0 +1,59 @@
+{
+  "$id": "https://github.com/VisionCraft3r/ultimate-pi/schemas/answers.schema.json",
+  "title": "ultimate-pi answers file",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "authMethod": { "type": "string" },
+          "credential": { "type": "string" }
+        }
+      }
+    },
+    "agentAssignments": { "$ref": "#/$defs/assignments" },
+    "agentModels": { "$ref": "#/$defs/assignments" },
+    "providerChains": { "$ref": "#/$defs/chains" },
+    "agentFallbacks": { "$ref": "#/$defs/chains" },
+    "fallbacks": { "type": "object" },
+    "packages": { "type": "array", "items": { "type": "string" } },
+    "extras": { "type": "object" },
+    "openrouterKey": { "type": "string" },
+    "deepseekKey": { "type": "string" }
+  },
+  "$defs": {
+    "assignments": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["provider", "model"],
+        "additionalProperties": false,
+        "properties": {
+          "provider": { "type": "string", "minLength": 1 },
+          "model": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "chains": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["provider", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "provider": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

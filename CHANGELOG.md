@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **JEV verification choice.** The same triage call now returns `Verification: tests | scout | browser | reviewer`. A worker wave no longer always gets a code reviewer. Tests are the default. A low-confidence verification answer stays on tests.
+
+- **JEV deadline.** Live triage and sentinel calls abort after `ULTIMATE_PI_JEV_TIMEOUT_MS` (default 8s) or when the tool is cancelled, then fall through to the heuristic with a visible timeout or cancelled warning.
+- **Shared tool-round budget.** Scout and qa_tester use one ceiling helper. `ULTIMATE_PI_WORKER_ROUND_NUDGE` (unset by default) asks a worker to wrap up after that many tool rounds and does not block tools.
+- **Bash denial breaker.** Three consecutive headless bash-guard blocks end the turn. An allowed command resets the count.
+- **Worker verify gate.** A worker that reports DONE without a backticked command under Verification gets one continuation steer.
+- **Declarative bash floor.** Rules carry a justification, an alternative, and examples. Optional `bash-rules.json` can tighten, or relax prompt-level commands, and cannot override the floor. `ultimate-pi bash-check` prints the decision.
+- **Reviewer JSON verdict.** Unparsable reviewer output counts as NEEDS CHANGES. `wave_diff` marks the worktree and returns the wave diff for the reviewer.
+- **Context cap.** The managed routing block has a byte budget checked by `npm run scan`. Oversized web and browser output is truncated, and spilled to a file only for roles that can read.
+- **Profile lint and schemas.** Doctor checks managed agent profiles. `schemas/answers.schema.json` and `schemas/model-agents.schema.json` describe the installer answers file and fallback file.
+- **Opt-in routing trace.** `ULTIMATE_PI_TRACE=1` writes a local JSONL under the agent directory. It is not uploaded. `routing.py` summarizes it.
+
+Extension changes apply on `/reload`. The managed routing block and agent profiles update through `ultimate-pi setup agents`, not from a package update alone.
+
 - **`reviewer` role.** Read-only sixth agent with its own model assignment. `tier_1`, `tier_2`, and `tier_3` keep their current first role, then one reviewer covers the worker wave. `tier_5_review` is a JEV noul for a code audit, project audit, security review, or PR/diff review and starts with the reviewer. Blocking findings on an implementation tier repair for up to two rounds. An audit that only asks for findings stops at the report. Existing installs get `agents/reviewer.md` from `ultimate-pi setup agents` or a new install, not from a package update alone. An answers file that omits `reviewer` copies the planner assignment into a separate entry.
 
 ## [1.1.0-alpha] — 2026-09-28

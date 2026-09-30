@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { realpathSync } from "node:fs";
 
 const SETUP_TOPICS = ["providers", "agents", "fallbacks", "jev", "memory", "extras"];
-const COMMANDS = ["install", "setup", "doctor", "uninstall"];
+const COMMANDS = ["install", "setup", "doctor", "uninstall", "bash-check"];
 
 function usage(code = 0) {
   console.log(`Usage:
@@ -13,9 +13,11 @@ function usage(code = 0) {
   ultimate-pi setup <${SETUP_TOPICS.join("|")}> [flags]
   ultimate-pi doctor [flags]
   ultimate-pi uninstall [flags]
+  ultimate-pi bash-check <command> [--agent <role>]
 
 Flags:
   --agent-dir <path>   Agent directory (else PI_CODING_AGENT_DIR, else ~/.pi/agent)
+  --agent <role>       bash-check only: evaluate the headless subagent floor
   --answers <file>     Pre-filled answers JSON (non-interactive)
   --yes                Accept all defaults
   --dry-run            Print actions without writing
@@ -50,6 +52,8 @@ export function parseArgs(argv) {
     noColor: Boolean(process.env.NO_COLOR),
     command: "install",
     setupTopic: null,
+    agentRole: null,
+    bashCommand: null,
   };
   const positionals = [];
 
@@ -67,6 +71,8 @@ export function parseArgs(argv) {
     else if (arg === "--no-color") options.noColor = true;
     else if (arg === "--agent-dir") options.agentDir = resolve(needValue(argv, ++i, arg));
     else if (arg.startsWith("--agent-dir=")) options.agentDir = resolve(arg.slice(12));
+    else if (arg === "--agent") options.agentRole = needValue(argv, ++i, arg);
+    else if (arg.startsWith("--agent=")) options.agentRole = arg.slice("--agent=".length);
     else if (arg === "--answers") options.answersPath = resolve(needValue(argv, ++i, arg));
     else if (arg.startsWith("--answers=")) options.answersPath = resolve(arg.slice(10));
     else if (arg.startsWith("-")) {
@@ -91,11 +97,17 @@ export function parseArgs(argv) {
       usage(1);
     }
     options.setupTopic = topic;
+  } else if (options.command === "bash-check") {
+    options.bashCommand = positionals.slice(1).join(" ");
+    if (!options.bashCommand) {
+      console.error("bash-check requires a command");
+      usage(1);
+    }
   } else if (topic) {
     console.error(`Unexpected argument: ${topic}`);
     usage(1);
   }
-  if (extra) {
+  if (extra && options.command !== "bash-check") {
     console.error(`Unexpected argument: ${extra}`);
     usage(1);
   }

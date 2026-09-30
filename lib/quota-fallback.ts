@@ -31,6 +31,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import { readEnabledModels, resolveScopedSwitchChain, type ModelRef } from "./model-agents.ts";
+import { traceEvent } from "./trace.ts";
 
 /** Appended so Pi's isRetryableAssistantError returns false (quota exceeded + cancelled). */
 const QUOTA_CANCEL_SUFFIX = "\ncancelled: quota exceeded";
@@ -213,6 +214,7 @@ async function switchAwayFrom(
         const from = current ? `${current.provider}/${current.id}` : deadProvider;
         const to = `${next.provider}/${next.id}`;
         notify(ctx, `429: ${from} quota gone — switched to ${to}`, "warning");
+        traceEvent("quota-fallback", { from, to });
         pendingContinue = true;
         return true;
       }

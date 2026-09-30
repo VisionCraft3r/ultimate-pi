@@ -52,7 +52,7 @@ The BMAD bridge is optional and is not part of a default install. Install asks a
 
 A v6 install is detected from `_bmad` and `.agents/skills/bmad-agent-*`. The first interactive session asks once: BMAD agents, or Ultimate PI agents. The answer is stored in `{project}/.pi/agent-system` and changes only when you ask, including `/agent-system`.
 
-Ultimate PI mode still calls `jev_triage`. Personas are a short card: name, role, and at most five principles. The planner brief gets one of them (architect, ux-designer, pm, or sm) matching the ask. If a story under `implementation_artifacts` already names files, that list is the map and scout is not spawned. Models stay the six roles from install, including `reviewer`. They are not asked again. After a worker wave changes source, the parent spawns one reviewer.
+Ultimate PI mode still calls `jev_triage`. Personas are a short card: name, role, and at most five principles. The planner brief gets one of them (architect, ux-designer, pm, or sm) matching the ask. If a story under `implementation_artifacts` already names files, that list is the map and scout is not spawned. Models stay the six roles from install, including `reviewer`. They are not asked again. After a worker wave changes source, the parent follows the triage `Verification:` line. A reviewer is spawned only when that line is `reviewer`.
 
 BMAD mode loads `.agents/skills` and does not send that work to scout, worker, planner, qa_tester, or reviewer. Bash-guard, edit-guard, and `/jobs` stay on.
 

@@ -1,8 +1,15 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { DynamicBorder, isToolCallEventType } from "@earendil-works/pi-coding-agent";
-import type { SelectItem } from "@earendil-works/pi-tui";
-import { Container, SelectList, Text } from "@earendil-works/pi-tui";
-import { parse as shellParse } from "shell-quote";
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import { analyzeBashCommand } from "./analyzer.ts";
+import { promptRunOrAbort } from "./ui.ts";
+import { checkBashCommand, readUserRulesLogged, userInteractiveOverride } from "../../lib/bash-policy.ts";
+import { traceEvent } from "../../lib/trace.ts";
+import { DenialBreaker, headlessBashOutcome } from "../../lib/denial-breaker.ts";
+import {
+	MAIN_DISABLED_BLOCKED,
+	evaluateDisabledMainBash,
+	evaluateHeadlessBash,
+} from "./rules.ts";
 import {
 	formatJobLines,
 	jobsDir,
@@ -12,407 +19,6 @@ import {
 	wrapBashForJobs,
 } from "../../lib/jobs.ts";
 
-type Severity = "high" | "medium";
-
-type Risk = {
-	severity: Severity;
-	reasons: string[];
-};
-
-type OpToken = { op: string; [k: string]: unknown };
-
-type Token = string | OpToken;
-
-function isOpToken(t: Token): t is OpToken {
-	return typeof t === "object" && t !== null && "op" in t;
-}
-
-function tokensToStrings(tokens: Token[]): string[] {
-	return tokens.filter((t) => typeof t === "string") as string[];
-}
-
-function splitOnOps(tokens: Token[], splitOps: string[]): Token[][] {
-	const out: Token[][] = [];
-	let current: Token[] = [];
-	for (const t of tokens) {
-		if (isOpToken(t) && splitOps.includes(t.op)) {
-			if (current.length) out.push(current);
-			current = [];
-			continue;
-		}
-		current.push(t);
-	}
-	if (current.length) out.push(current);
-	return out;
-}
-
-function hasFlag(args: string[], flag: string): boolean {
-	return args.includes(flag) || args.some((a) => a.startsWith(flag) && flag.length === 2 && a.startsWith("-"));
-}
-
-function anyArgStartsWith(args: string[], prefix: string): boolean {
-	return args.some((a) => a.startsWith(prefix));
-}
-
-function commandBaseName(cmd: string): string {
-	return cmd.split(/[/\\]/).pop() ?? cmd;
-}
-
-function isInterpreterCommand(cmd: string): boolean {
-	const base = commandBaseName(cmd).toLowerCase();
-	return /^(python(\d+(\.\d+)*)?|pypy(\d+)?|perl|ruby|node|nodejs)$/.test(base);
-}
-
-/** Extract the script passed to python/perl/ruby/node `-c`/`-e` (and perl `-pe`/`-ne`). */
-function snippetFromDashCE(rest: string[]): string | null {
-	for (let i = 0; i < rest.length; i++) {
-		const a = rest[i];
-		if (a === "-c" || a === "-e") return rest[i + 1] ?? "";
-		if (a.startsWith("-c") && a.length > 2 && !a.startsWith("--")) return a.slice(2);
-		if (a.startsWith("-e") && a.length > 2 && !a.startsWith("--")) return a.slice(2);
-		// perl -pe/-ne: program is the next argument
-		if (/^-[a-zA-Z]*e[a-zA-Z]*$/.test(a) && a !== "-e") return rest[i + 1] ?? "";
-	}
-	return null;
-}
-
-/** Dangerous substrings inside interpreter one-liners — same family as HEADLESS_BLOCKED. */
-const EMBEDDED_DANGER: Array<{ pattern: RegExp; reason: string }> = [
-	{ pattern: /(?<!\bgit\s+)\brm\b[^#\n]*\s-(?:[a-zA-Z]*[rR]|-\brecursive\b)/, reason: "interpreter -c/-e snippet contains recursive delete (rm -r)" },
-	{ pattern: /\bsudo\b/, reason: "interpreter -c/-e snippet contains sudo (elevated privileges)" },
-	{ pattern: /\bmkfs/, reason: "interpreter -c/-e snippet contains mkfs (filesystem formatting)" },
-	{ pattern: /\bdd\b[^#\n]*\bof=/, reason: "interpreter -c/-e snippet contains dd with output (can overwrite data)" },
-	{ pattern: /\b(curl|wget)\b[^#\n]*\|\s*(ba?sh|zsh|fish|dash|sh)\b/, reason: "interpreter -c/-e snippet contains pipe to shell (remote code execution)" },
-];
-
-function collectInterpreterSnippets(args: string[]): string[] {
-	const snippets: string[] = [];
-	for (let i = 0; i < args.length; i++) {
-		if (!isInterpreterCommand(args[i])) continue;
-		const snippet = snippetFromDashCE(args.slice(i + 1));
-		if (snippet != null && snippet.length > 0) snippets.push(snippet);
-	}
-	return snippets;
-}
-
-function analyzeSegment(seg: Token[]): Risk | null {
-	const reasons: string[] = [];
-	let severity: Severity = "medium";
-
-	const ops = seg.filter(isOpToken).map((o) => o.op);
-	const args = tokensToStrings(seg);
-	if (args.length === 0) return null;
-
-	const cmd = args[0];
-	const rest = args.slice(1);
-
-	// Shell redirection / pipes are handled on the whole command, but keep some segment checks too.
-	if (ops.includes("|") && (args.includes("sh") || args.includes("bash") || args.includes("zsh") || args.includes("fish"))) {
-		reasons.push("pipe to a shell (possible remote code execution)");
-		severity = "high";
-	}
-
-	// xargs rm (including `... | xargs rm`)
-	const xargsIdx = args.indexOf("xargs");
-	if (xargsIdx >= 0) {
-		const after = args.slice(xargsIdx + 1);
-		const xargsTarget = after.find((a) => !a.startsWith("-"));
-		if (xargsTarget === "rm" || xargsTarget === "rmdir" || xargsTarget === "unlink") {
-			severity = "high";
-			reasons.push("xargs rm (bulk deletion)");
-		}
-	}
-
-	// python/perl/ruby/node -c/-e one-liners that embed destructive commands
-	for (const snippet of collectInterpreterSnippets(args)) {
-		for (const { pattern, reason } of EMBEDDED_DANGER) {
-			if (pattern.test(snippet)) {
-				severity = "high";
-				reasons.push(reason);
-			}
-		}
-	}
-
-	// sudo
-	if (cmd === "sudo") {
-		reasons.push("sudo (elevated privileges)");
-		severity = "high";
-	}
-
-	// rm/rmdir/unlink
-	if (cmd === "rm" || cmd === "rmdir" || cmd === "unlink") {
-		severity = "high";
-		reasons.push(`${cmd} (file deletion)`);
-		if (rest.some((a) => a.includes("-r") || a.includes("-R"))) reasons.push("recursive delete (-r/-R)");
-		if (rest.some((a) => a.includes("-f"))) reasons.push("forced delete (-f)");
-		if (ops.includes("glob")) reasons.push("glob pattern expansion (may delete many files)");
-	}
-
-	// find -delete
-	if (cmd === "find" && rest.includes("-delete")) {
-		severity = "high";
-		reasons.push("find -delete (bulk deletion)");
-	}
-
-	// git: only actually risky subcommands (not every git invocation)
-	if (cmd === "git") {
-		const sub = rest[0];
-		const subArgs = rest.slice(1);
-
-		if (sub === "rm") {
-			severity = "high";
-			reasons.push("git rm (deletes files from working tree and stages deletions)");
-		}
-		if (sub === "clean" && (subArgs.some((a) => a.includes("-f")) || subArgs.includes("-d") || subArgs.includes("-x"))) {
-			severity = "high";
-			reasons.push("git clean (can delete untracked files)");
-		}
-		if (sub === "reset" && subArgs.includes("--hard")) {
-			severity = "high";
-			reasons.push("git reset --hard (discard changes)");
-		}
-		if ((sub === "checkout" || sub === "restore") && (subArgs.includes(".") || subArgs.includes("--") || subArgs.includes("--source"))) {
-			severity = severity === "high" ? "high" : "medium";
-			reasons.push("git checkout/restore (can overwrite working tree)");
-		}
-		if (sub === "push" && (subArgs.includes("--force") || subArgs.includes("--force-with-lease") || subArgs.includes("-f"))) {
-			severity = "high";
-			reasons.push("git push --force (rewrite remote history)");
-		}
-		if (sub === "reflog" && subArgs.includes("expire")) {
-			severity = "high";
-			reasons.push("git reflog expire (can remove recovery history)");
-		}
-		if (sub === "gc" && subArgs.some((a) => a.startsWith("--prune"))) {
-			severity = "high";
-			reasons.push("git gc --prune (can permanently delete objects)");
-		}
-	}
-
-	// truncate
-	if (cmd === "truncate") {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("truncate (in-place size change, can erase contents)");
-	}
-
-	// dd of=
-	if (cmd === "dd" && (anyArgStartsWith(rest, "of=") || rest.includes("of"))) {
-		severity = "high";
-		reasons.push("dd with output file/device (can overwrite data)");
-	}
-
-	// Disk / volume management (prompt aggressively; high risk)
-	// Linux: mkfs.*, wipefs, parted, fdisk, gdisk/sgdisk, cryptsetup, LVM tools, zpool
-	// macOS: diskutil, hdiutil, gpt, newfs_*, asr
-	if (cmd.startsWith("mkfs")) {
-		severity = "high";
-		reasons.push("mkfs (filesystem formatting)");
-	}
-	if (cmd.startsWith("newfs_")) {
-		severity = "high";
-		reasons.push("newfs_* (filesystem formatting)");
-	}
-	if (cmd === "wipefs") {
-		severity = "high";
-		reasons.push("wipefs (disk signature wipe)");
-	}
-	if (cmd === "diskutil") {
-		severity = "high";
-		reasons.push("diskutil (disk management command)");
-		if (rest.includes("eraseDisk") || rest.includes("eraseVolume")) {
-			reasons.push("diskutil erase (destructive disk operation)");
-		}
-	}
-	if (cmd === "hdiutil") {
-		severity = "high";
-		reasons.push("hdiutil (disk image management command)");
-	}
-	if (cmd === "gpt") {
-		severity = "high";
-		reasons.push("gpt (partition table manipulation)");
-	}
-	if (cmd === "asr") {
-		severity = "high";
-		reasons.push("asr (Apple Software Restore; can overwrite volumes)");
-	}
-	if (cmd === "parted" || cmd === "fdisk" || cmd === "gdisk" || cmd === "sgdisk") {
-		severity = "high";
-		reasons.push(`${cmd} (disk/partition management)`);
-	}
-	if (cmd === "cryptsetup") {
-		severity = "high";
-		reasons.push("cryptsetup (disk encryption management)");
-	}
-	if (cmd === "pvcreate" || cmd === "vgcreate" || cmd === "lvcreate") {
-		severity = "high";
-		reasons.push(`${cmd} (LVM volume management)`);
-	}
-	if (cmd === "zpool") {
-		severity = "high";
-		reasons.push("zpool (ZFS pool management)");
-	}
-
-	// chmod/chown recursive
-	if (cmd === "chmod" && (rest.includes("-R") || rest.includes("--recursive"))) {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("chmod -R (recursive permission changes)");
-	}
-	if (cmd === "chown" && (rest.includes("-R") || rest.includes("--recursive"))) {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("chown -R (recursive ownership changes)");
-	}
-
-	// mv/cp overwriting
-	if (cmd === "mv" && (rest.includes("-f") || rest.includes("--force"))) {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("mv --force/-f (can overwrite files)");
-	}
-	if (cmd === "cp" && (rest.includes("-f") || rest.includes("--force"))) {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("cp --force/-f (can overwrite files)");
-	}
-
-	// sed/perl in-place
-	if (cmd === "sed" && (hasFlag(rest, "-i") || rest.includes("--in-place"))) {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("sed -i (in-place file modification)");
-	}
-	if (cmd === "perl" && (rest.includes("-pi") || (rest.includes("-p") && rest.includes("-i")))) {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("perl -pi/-i (in-place file modification)");
-	}
-
-	// kill/shutdown/systemctl
-	if (cmd === "kill" || cmd === "pkill" || cmd === "killall") {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push(`${cmd} (process termination)`);
-		if (rest.includes("-9")) {
-			severity = "high";
-			reasons.push("SIGKILL (-9)");
-		}
-	}
-	if (cmd === "shutdown" || cmd === "reboot") {
-		severity = "high";
-		reasons.push(`${cmd} (system power operation)`);
-	}
-	if (cmd === "systemctl" && (rest.includes("stop") || rest.includes("disable"))) {
-		severity = severity === "high" ? "high" : "medium";
-		reasons.push("systemctl stop/disable (service disruption)");
-	}
-
-	// Remote execution patterns
-	if ((cmd === "curl" || cmd === "wget") && ops.includes("|")) {
-		severity = "high";
-		reasons.push("curl/wget piped (possible remote code execution)");
-	}
-
-	// Infra deletes
-	if (cmd === "kubectl" && rest[0] === "delete") {
-		severity = "high";
-		reasons.push("kubectl delete (resource deletion)");
-	}
-	if (cmd === "terraform" && rest[0] === "destroy") {
-		severity = "high";
-		reasons.push("terraform destroy (infrastructure teardown)");
-	}
-	if (cmd === "aws" && rest[0] === "s3" && rest[1] === "rm" && rest.includes("--recursive")) {
-		severity = "high";
-		reasons.push("aws s3 rm --recursive (bulk deletion)");
-	}
-	if (cmd === "gcloud" && rest.includes("delete")) {
-		severity = "high";
-		reasons.push("gcloud delete (resource deletion)");
-	}
-
-	if (reasons.length === 0) return null;
-	return { severity, reasons };
-}
-
-export function analyzeBashCommand(command: string): Risk | null {
-	let tokens: Token[];
-	try {
-		tokens = shellParse(command) as Token[];
-	} catch {
-		// Fallback: if we can't parse, treat it as questionable
-		return { severity: "medium", reasons: ["unparsed shell command (unable to analyze safely)"] };
-	}
-
-	const reasons: string[] = [];
-	let severity: Severity = "medium";
-
-	// Whole-command operator checks
-	const ops = tokens.filter(isOpToken).map((t) => t.op);
-	if (ops.some((op) => op === ">" || op === ">>" || op === "2>" || op === "2>>")) {
-		reasons.push("shell output redirection (can overwrite files)");
-		// severity stays at its current value here — output redirection alone doesn't escalate.
-	}
-	if (ops.includes("<")) {
-		reasons.push("shell input redirection (questionable)");
-	}
-	if (ops.includes("|")) {
-		reasons.push("pipe operator (chained commands)");
-	}
-
-	// Segment analysis (split on &&, ||, ;)
-	const segments = splitOnOps(tokens, ["&&", "||", ";"]);
-	for (const seg of segments) {
-		const segRisk = analyzeSegment(seg);
-		if (!segRisk) continue;
-		if (segRisk.severity === "high") severity = "high";
-		for (const r of segRisk.reasons) reasons.push(r);
-	}
-
-	// De-duplicate reasons
-	const uniq = [...new Set(reasons)];
-	if (uniq.length === 0) return null;
-	return { severity, reasons: uniq };
-}
-
-async function promptRunOrAbort(ctx: any, command: string, risk: Risk): Promise<"run" | "abort"> {
-	if (!ctx.hasUI) return "abort";
-
-	const reasonsText = risk.reasons.map((r) => `• ${r}`).join("\n");
-	const header = `Command flagged as ${risk.severity.toUpperCase()} risk:`;
-	const body = `${header}\n\n${reasonsText}\n\nCommand:\n${command}`;
-
-	const items: SelectItem[] = [
-		{ value: "run", label: "Run", description: "Execute the command" },
-		{ value: "abort", label: "Abort", description: "Block this command" },
-	];
-
-	// SAFETY: ctx.ui.custom is untyped/generic-less in this pi-coding-agent version; cast to bridge the callback shape.
-	const choice = await (ctx.ui.custom as any)((tui: any, theme: any, _kb: any, done: (result: "run" | "abort") => void) => {
-		const container = new Container();
-		container.addChild(new DynamicBorder((s: string) => theme.fg("warning", s)));
-		container.addChild(new Text(theme.fg("warning", theme.bold("Potentially destructive bash command")), 1, 0));
-		container.addChild(new Text(body, 1, 0));
-
-		const list = new SelectList(items, items.length, {
-			selectedPrefix: (t) => theme.fg("accent", t),
-			selectedText: (t) => theme.fg("accent", t),
-			description: (t) => theme.fg("muted", t),
-			scrollInfo: (t) => theme.fg("dim", t),
-			noMatch: (t) => theme.fg("warning", t),
-		});
-
-		list.onSelect = (item) => done(item.value as "run" | "abort");
-		list.onCancel = () => done("abort");
-		container.addChild(list);
-
-		container.addChild(new DynamicBorder((s: string) => theme.fg("warning", s)));
-
-		return {
-			render: (w) => container.render(w),
-			invalidate: () => container.invalidate(),
-			handleInput: (data) => {
-				list.handleInput(data);
-				tui.requestRender();
-			},
-		};
-	}, { overlay: true });
-
-	return choice ?? "abort";
-}
 
 // PI_SUBAGENT_DEPTH is 0 (or unset) in the main session and >= 1 in spawned subagent processes.
 // Current pi-interactive-subagents does not set DEPTH; it does set PI_SUBAGENT_ID / AGENT.
@@ -423,102 +29,8 @@ const _isSubagent =
 	(Number.isFinite(_subagentDepth) && _subagentDepth >= 1) ||
 	Boolean(process.env.PI_SUBAGENT_ID || process.env.PI_SUBAGENT_AGENT);
 
-// Hard-block patterns for subagent (headless) mode. Criteria: unrecoverable by default AND
-// unlikely to be intentional in an automated context. Fewer false positives over broad coverage —
-// the interactive prompt handles the rest for main sessions.
-const HEADLESS_BLOCKED: Array<{ pattern: RegExp; reason: string }> = [
-	// Recursive deletion
-	{ pattern: /(?<!\bgit\s+)\brm\b[^#\n]*\s-(?:[a-zA-Z]*[rR]|-\brecursive\b)/, reason: "recursive delete (rm -r / -rf / -Rf)" },
-	// Privilege escalation
-	{ pattern: /\bsudo\b/, reason: "elevated privileges (sudo)" },
-	// Remote code execution via pipe-to-shell
-	{ pattern: /\b(curl|wget)\b[^#\n]*\|\s*(ba?sh|zsh|fish|dash|sh)\b/, reason: "pipe to shell (remote code execution)" },
-	// Disk / filesystem destruction
-	{ pattern: /\bmkfs/, reason: "filesystem formatting (mkfs)" },
-	{ pattern: /\bnewfs_\w+/, reason: "filesystem formatting (newfs_*)" },
-	{ pattern: /\bwipefs\b/, reason: "disk signature wipe" },
-	{ pattern: /\bdiskutil\s+(erase|zeroDisk|secureErase|reformat)/i, reason: "destructive disk operation (diskutil)" },
-	{ pattern: /\bdd\b[^#\n]*\bof=\/dev\//, reason: "raw disk write (dd of=/dev/...)" },
-	{ pattern: /\b(parted|fdisk|gdisk|sgdisk)\b/, reason: "partition table management" },
-	{ pattern: /\bcryptsetup\b/, reason: "disk encryption management" },
-	{ pattern: /\bzpool\b/, reason: "ZFS pool management" },
-	// System power
-	{ pattern: /\b(shutdown|reboot|halt|poweroff)\b/, reason: "system power operation" },
-	// Infrastructure teardown
-	{ pattern: /\bterraform\s+destroy\b/, reason: "infrastructure teardown (terraform destroy)" },
-	{ pattern: /\bkubectl\s+delete\b/, reason: "Kubernetes resource deletion" },
-	{ pattern: /\baws\s+s3\s+rm\b[^#\n]*--recursive/, reason: "bulk S3 deletion (aws s3 rm --recursive)" },
-	// Destructive git operations. `git commit` stays in this list so MAIN_DISABLED_BLOCKED
-	// can keep filtering it the same way; subagents get an explicit local-only allowlist
-	// exception for commit/add in evaluateHeadlessBash. push/pull remain blocked.
-	{ pattern: /\bgit\s+commit\b/, reason: "git commit (commits are main-session operations)" },
-	{ pattern: /\bgit\s+add\b/, reason: "git add (staging is a main-session operation)" },
-	{ pattern: /\bgit\s+pull\b/, reason: "git pull (pulls are main-session operations)" },
-	{ pattern: /\bgit\s+push\b/, reason: "git push (pushes are main-session operations)" },
-	{ pattern: /\bgit\s+reset\b[^#\n]*--hard\b/, reason: "discard all uncommitted changes (git reset --hard)" },
-	{ pattern: /\bgit\s+clean\b[^#\n]*-[a-zA-Z]*f/, reason: "delete untracked files (git clean -f)" },
-	{ pattern: /\bgit\s+reflog\s+expire\b/, reason: "expire reflog (removes recovery history)" },
-	{ pattern: /\bgit\s+gc\b[^#\n]*--prune\b/, reason: "prune unreachable objects (git gc --prune)" },
-];
-
-// Subset of HEADLESS_BLOCKED used as the hard-block floor when bash-guard is
-// disabled in an interactive (main) session. The user explicitly opts into
-// autonomy here, so routine git operations (commit/pull/push) are allowed
-// through; only truly catastrophic / non-recoverable patterns remain blocked.
-export const MAIN_DISABLED_BLOCKED: Array<{ pattern: RegExp; reason: string }> = HEADLESS_BLOCKED.filter(
-	({ pattern }) => {
-		const src = pattern.source;
-		return !(
-			src.includes("git\\s+commit") ||
-			src.includes("git\\s+add") ||
-			src.includes("git\\s+pull") ||
-			// Keep `git push --force` blocked but allow plain `git push`.
-			src === "\\bgit\\s+push\\b"
-		);
-	},
-);
-
-export type BashGuardDecision = { block: true; reason: string };
-
-/** Local-only git ops subagents may perform (no remote state). Pattern sources from HEADLESS_BLOCKED. */
-const SUBAGENT_ALLOWED_GIT_PATTERNS = new Set(["\\bgit\\s+commit\\b", "\\bgit\\s+add\\b"]);
-
-function isSubagentAllowedGitPattern(pattern: RegExp): boolean {
-	return SUBAGENT_ALLOWED_GIT_PATTERNS.has(pattern.source);
-}
-
-/** Hard-block floor for non-interactive subagent sessions, with a narrow git add/commit allowlist. */
-export function evaluateHeadlessBash(command: string): BashGuardDecision | undefined {
-	for (const { pattern, reason } of HEADLESS_BLOCKED) {
-		if (!pattern.test(command)) continue;
-		if (isSubagentAllowedGitPattern(pattern)) continue;
-		return {
-			block: true,
-			reason:
-				`Blocked by bash-guard: ${reason}. ` +
-				"This is a non-interactive subagent session — catastrophic operations are not permitted. " +
-				"Propose a safer alternative or ask the parent agent to confirm with the user.",
-		};
-	}
-	return undefined;
-}
-
-/** Catastrophic floor applied in the main session even when bash-guard is otherwise disabled. */
-export function evaluateDisabledMainBash(command: string): BashGuardDecision | undefined {
-	for (const { pattern, reason } of MAIN_DISABLED_BLOCKED) {
-		if (pattern.test(command)) {
-			return {
-				block: true,
-				reason:
-					`Blocked by bash-guard: ${reason}. ` +
-					"Bash-guard interactive prompting is disabled, but the catastrophic-operation floor remains in effect. " +
-					"Propose a safer alternative or re-enable bash-guard with /bash-guard.",
-			};
-		}
-	}
-	return undefined;
-}
-
+export { analyzeBashCommand } from "./analyzer.ts";
+export { MAIN_DISABLED_BLOCKED, evaluateDisabledMainBash, evaluateHeadlessBash };
 // Warning shown via ctx.ui.setStatus when bash-guard is disabled. Pi joins all
 // extension statuses on a single line sorted alphabetically by key, so:
 //
@@ -577,10 +89,28 @@ export default function (pi: ExtensionAPI) {
 
 	if (_isSubagent) {
 		// Subagent mode: hard-block catastrophic operations, no prompting.
+		// Three denials in a row end the turn so the agent reports BLOCKED.
+		const breaker = new DenialBreaker();
 		pi.on("tool_call", async (event) => {
 			if (!isToolCallEventType("bash", event)) return;
-			const decision = evaluateHeadlessBash(event.input.command);
-			if (decision) return decision;
+			const checked = checkBashCommand(event.input.command, {
+				headless: true,
+				rules: readUserRulesLogged(resolveAgentDir()),
+			});
+			const outcome = headlessBashOutcome(
+				breaker,
+				checked.decision === "forbidden"
+					? { block: true, reason: checked.reason ?? "Blocked by bash-guard." }
+					: undefined,
+				event.input.command,
+			);
+			if ("block" in outcome) {
+				traceEvent("bash-guard", {
+					decision: outcome.terminate ? "terminate" : "forbidden",
+					reason: outcome.reason,
+				});
+				return outcome;
+			}
 			event.input.command = recordAllowedBash(event.input.command);
 		});
 		return;
@@ -648,13 +178,31 @@ export default function (pi: ExtensionAPI) {
 		// Disabled mode skips interactive prompting, but the documented
 		// MAIN_DISABLED_BLOCKED catastrophic floor still applies.
 		if (disabled) {
-			const decision = evaluateDisabledMainBash(command);
-			if (decision) return decision;
+			const checked = checkBashCommand(command, {
+				headless: false,
+				rules: readUserRulesLogged(resolveAgentDir()),
+			});
+			if (checked.decision === "forbidden") {
+				traceEvent("bash-guard", { decision: "forbidden", reason: checked.reason ?? "" });
+				return { block: true, reason: checked.reason ?? "Blocked by bash-guard." };
+			}
 			event.input.command = recordAllowedBash(command);
 			return;
 		}
 
-		const risk = analyzeBashCommand(command);
+		const override = userInteractiveOverride(command, readUserRulesLogged(resolveAgentDir()));
+		if (override === "block") {
+			return { block: true, reason: "Blocked by user bash rule." };
+		}
+		if (override === "allow") {
+			event.input.command = recordAllowedBash(command);
+			return;
+		}
+
+		const risk = analyzeBashCommand(command) ??
+			(override === "prompt"
+				? { severity: "medium" as const, reasons: ["user bash rule asks for confirmation"] }
+				: null);
 		if (!risk) {
 			event.input.command = recordAllowedBash(command);
 			return;

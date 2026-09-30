@@ -231,7 +231,7 @@ confidence threshold (`≥ 0.7`). `tier_5_review` is a separate code-review
 noul with the same thresholds, so the word "review" does not steal a fix or
 a plan. Results below 70% confidence for `tier_3`/`tier_4_qa`/`tier_5_review`,
 or below 50% for other tiers, are treated as low confidence and flagged.
-Implementation tiers still end with one `reviewer` after the worker wave.
+Implementation tiers follow the triage `Verification:` line. `tests` stops at the worker's check. `scout` and `browser` are the other checks. `reviewer` is the only one that spawns the code reviewer.
 
 JEV itself is **[Jev](https://openrouter.ai/typesafe/jev-1.13)**, a proprietary
 System One decision model by [TypeSafe AI](https://typesafe.ai/), accessed via

@@ -19,6 +19,14 @@ All scripts share the same filter vocabulary (see "Shared filters" below). Run t
 python3 ~/.pi/agent/skills/analyze-sessions/scripts/<script>.py [args]
 ```
 
+### `routing.py` — opt-in routing trace
+
+Reads one `<agentDir>/traces/*.jsonl` file written when `ULTIMATE_PI_TRACE=1`. Prints tier counts, triage source, fallback hops, bash blocks, and review repairs. It does not read session transcripts and it does not upload anything.
+
+```bash
+python3 routing.py ~/.pi/agent/traces/main.jsonl
+```
+
 ### `cost.py` — cost rollups
 
 Subagent costs are **included by default** so totals reflect actual spend. Pass `--show-subagents` to see the subagent share per row, or `--no-subagents` to exclude.

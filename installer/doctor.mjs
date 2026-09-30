@@ -3,6 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { checkNode, checkPi, checkTmux, resolveAgentDir } from "./preflight.mjs";
 import { readAuth } from "./auth-store.mjs";
+import { readUserRules } from "../lib/bash-policy.ts";
+import { lintAgentProfile } from "../lib/agent-profile.ts";
+import { managedBlockBytes } from "../scripts/check-context-budget.mjs";
 
 const SELF_PACKAGE_NAME = "ultimate-pi";
 const SUBAGENTS_GIT_REPO = "github.com/amosblomqvist/pi-interactive-subagents";
@@ -213,6 +216,41 @@ async function checkFallbackConfig(agentDir, configuredProviders) {
   return mark(true, "fallback config", "model-agents.json parses and all referenced providers are configured");
 }
 
+function checkBashRules(agentDir) {
+  const loaded = readUserRules(agentDir);
+  if (loaded.error) return mark(false, "bash rules", loaded.error);
+  if (loaded.dropped.length > 0) {
+    return mark(false, "bash rules", loaded.dropped.join("; "));
+  }
+  if (loaded.rules.length === 0) return mark(true, "bash rules", "no bash-rules.json (built-in floor only)");
+  return mark(true, "bash rules", `${loaded.rules.length} user rule(s); floor stays immutable`);
+}
+
+async function checkAgentProfiles(agentDir) {
+  const dir = path.join(agentDir, "agents");
+  if (!existsSync(dir)) return mark(true, "agent profiles", "no agents/ yet");
+  const names = (await fs.readdir(dir)).filter((name) => name.endsWith(".md"));
+  const errors = [];
+  let managed = 0;
+  for (const name of names) {
+    const text = await fs.readFile(path.join(dir, name), "utf8");
+    if (!text.includes("managed-by: ultimate-pi")) continue;
+    managed += 1;
+    errors.push(...lintAgentProfile(text, name));
+  }
+  if (errors.length > 0) return mark(false, "agent profiles", errors.join("; "));
+  return mark(true, "agent profiles", managed === 0 ? "no managed profiles" : `${managed} managed profile(s)`);
+}
+
+async function checkRoutingBlock(agentDir) {
+  const file = path.join(agentDir, "AGENTS.md");
+  if (!existsSync(file)) return mark(true, "routing block", "no AGENTS.md yet");
+  const text = await fs.readFile(file, "utf8");
+  const bytes = managedBlockBytes(text);
+  if (bytes == null) return mark(true, "routing block", "no managed markers");
+  return mark(true, "routing block", `${bytes} bytes`);
+}
+
 /**
  * Post-install health check. Prints ✔/✖ lines and returns a summary object.
  * @param {object} options
@@ -236,6 +274,9 @@ export async function doctor(options = {}) {
   checks.push(await checkProviders(agentDir));
   checks.push(await checkRequiredPackages(agentDir, options));
   checks.push(await checkFallbackConfig(agentDir, Object.keys(auth ?? {})));
+  checks.push(checkBashRules(agentDir));
+  checks.push(await checkRoutingBlock(agentDir));
+  checks.push(await checkAgentProfiles(agentDir));
 
   const ok = checks.every((check) => check.ok);
   mark(ok, "doctor", ok ? "all checks passed" : "one or more checks failed");

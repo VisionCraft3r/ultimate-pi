@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 import bashGuard from "./bash-guard/index.ts";
 import { resolveOpenRouterApiKey } from "../lib/openrouter-auth.ts";
 import { installQuotaFallback } from "../lib/quota-fallback.ts";
-import { resolveJevEndpoint, resolveJevModel } from "../lib/jev-config.ts";
+import { installSoftRoundNudge, WORKER_NUDGE_REASON, workerRoundNudgeLimit } from "../lib/round-budget.ts";
+import { VERIFY_GATE_REASON, lastAssistantText, verifyGateAction } from "../lib/verify-gate.ts";
+import { jevFailureReason, jevRequestSignal, resolveJevEndpoint, resolveJevModel } from "../lib/jev-config.ts";
 import { HEURISTIC_UNCONFIGURED_PREFIX, formatUnavailablePrefix } from "../lib/jev-heuristic.ts";
 
 const THIS_FILE = fileURLToPath(import.meta.url);
@@ -48,6 +50,39 @@ export default function (pi: ExtensionAPI) {
     bashGuard(pi);
   }
 
+  if (process.env.PI_SUBAGENT_AGENT === "worker") {
+    const nudgeAt = workerRoundNudgeLimit();
+    if (nudgeAt) {
+      installSoftRoundNudge(pi, {
+        ceiling: nudgeAt,
+        reason: WORKER_NUDGE_REASON,
+        customType: "worker-round-nudge",
+      });
+    }
+
+    let verifyNudged = false;
+    pi.on("agent_before_settle", (event, ctx) => {
+      const settle = event as { outcome?: string; context?: { canContinue?: boolean; sessionManager?: { getEntries?: () => unknown[] } } };
+      if (settle.outcome !== "completed" || !settle.context?.canContinue) return;
+      const fromCtx = ctx as { sessionManager?: { getEntries?: () => unknown[] } } | undefined;
+      const session = fromCtx?.sessionManager?.getEntries ? fromCtx : settle.context;
+      const action = verifyGateAction(lastAssistantText(session), verifyNudged);
+      if (!action) return;
+      verifyNudged = true;
+      return {
+        continue: true,
+        entries: [
+          {
+            type: "custom_message" as const,
+            customType: "verify-gate",
+            content: VERIFY_GATE_REASON,
+            display: true,
+          },
+        ],
+      };
+    });
+  }
+
   installQuotaFallback(pi);
 
   pi.registerTool({
@@ -75,6 +110,7 @@ export default function (pi: ExtensionAPI) {
       try {
         const response = await fetch(resolveJevEndpoint(), {
           method: "POST",
+          signal: jevRequestSignal(signal),
           headers: {
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json"
@@ -105,8 +141,7 @@ export default function (pi: ExtensionAPI) {
         const confidencePct = Math.round((answer.confidence || 0) * 100);
         return { content: [{ type: "text", text: `Sentinel Result: ${answer.choice} (Confidence: ${confidencePct}%).` }], details: {} };
       } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: "text", text: heuristicSentinel(params.state, params.instructions, `network error: ${reason}`) }], details: {} };
+        return { content: [{ type: "text", text: heuristicSentinel(params.state, params.instructions, jevFailureReason(err)) }], details: {} };
       }
     }
   });

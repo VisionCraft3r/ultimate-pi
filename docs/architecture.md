@@ -17,9 +17,9 @@ For provider setup see [docs/providers.md](./providers.md). For JEV itself see [
 user → orchestrator (main session)
         → jev_triage
             → tier_0      answer in the main session (no subagent)
-            → tier_1      one worker, then reviewer if source changed
-            → tier_2      scout, then worker, then reviewer if source changed
-            → tier_3      planner → spec-ready review → workers → reviewer
+            → tier_1      one worker, then Verification: tests | scout | browser | reviewer
+            → tier_2      scout, then worker, then the same Verification line
+            → tier_3      planner → spec-ready review → workers → the same Verification line
             → tier_4_qa   qa_tester (live browser/UI)
             → tier_5_review reviewer (code or project audit)
             → researcher  spawned when the orchestrator needs external docs

@@ -1,0 +1,33 @@
+{
+  "$id": "https://github.com/VisionCraft3r/ultimate-pi/schemas/model-agents.schema.json",
+  "title": "model-agents.json",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "fallbacks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/modelRef" }
+      }
+    },
+    "agentFallbacks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/modelRef" }
+      }
+    }
+  },
+  "$defs": {
+    "modelRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "id"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

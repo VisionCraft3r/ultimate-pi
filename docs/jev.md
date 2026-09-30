@@ -34,7 +34,7 @@ Docs: [TypeSafe AI](https://typesafe.ai/), [TypeSafe docs](https://docs.typesafe
 
 `researcher` is not a JEV tier. The orchestrator spawns it when external docs or web research are needed.
 
-`tier_1`, `tier_2`, and `tier_3` keep their current first role. After a worker wave changes source, the orchestrator spawns one `reviewer` for that wave. `tier_5_review` is the only tier that starts with the reviewer. "Review the plan" and "create a plan" stay `tier_3`.
+`tier_1`, `tier_2`, and `tier_3` keep their current first role. The same call also returns `Verification:`. `tests` means the worker's own check is enough. `scout` re-reads the changed logic. `browser` is one `qa_tester`. `reviewer` is the only value that spawns the code reviewer. A missing or low-confidence verification choice stays on `tests`, so a weak call cannot invent a review. `tier_4_qa` is `browser`. `tier_5_review` is `reviewer` and is the only tier that starts with the reviewer. "Review the plan" and "create a plan" stay `tier_3`.
 
 Short continuation crumbs ("ok", "ship it", "alright") short-circuit to `tier_0` at confidence 100 so they cannot restart a plan.
 
@@ -84,6 +84,7 @@ Configure a key with `ultimate-pi setup jev` (or include `openrouter` in `ultima
 |---|---|
 | `ULTIMATE_PI_JEV_MODEL` | `typesafe/jev-1.13` |
 | `ULTIMATE_PI_JEV_ENDPOINT` | `https://openrouter.ai/api/alpha/decisions` |
+| `ULTIMATE_PI_JEV_TIMEOUT_MS` | `8000` |
 
 Defined in `lib/jev-config.ts`. Empty/whitespace values fall back to the defaults. Auth is separate: `OPENROUTER_API_KEY` wins over `auth.json` (`lib/openrouter-auth.ts`).
 

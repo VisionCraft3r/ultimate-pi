@@ -50,3 +50,11 @@ APPROVED | NEEDS CHANGES
 None, or non-blocking notes.
 
 Omit Findings when there are none.
+
+After that markdown, end with one fenced JSON block and nothing after it:
+
+```json
+{"verdict":"APPROVED","findings":[]}
+```
+
+`verdict` is `APPROVED` or `NEEDS CHANGES`. Each finding has `severity` (`P0`–`P3`), `file`, `line`, `issue`, and `fix`. `APPROVED` may only include `P3` findings, or none. A missing or invalid block is treated as `NEEDS CHANGES`.

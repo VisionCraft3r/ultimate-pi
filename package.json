@@ -5,7 +5,12 @@
   "type": "module",
   "license": "MIT",
   "repository": "github:VisionCraft3r/ultimate-pi",
-  "keywords": ["pi-package", "pi", "ai-agents", "multi-agent"],
+  "keywords": [
+    "pi-package",
+    "pi",
+    "ai-agents",
+    "multi-agent"
+  ],
   "bin": {
     "ultimate-pi": "bin/ultimate-pi.mjs"
   },
@@ -26,13 +31,17 @@
       "./extensions/paperclip-mirror.ts",
       "./extensions/paperclip-subagent-hold.ts",
       "./extensions/launch-update.ts",
+      "./extensions/wave-diff.ts",
+      "./extensions/review-trace.ts",
       "./extensions/bash-guard/index.ts",
       "./extensions/browser/index.ts",
       "./extensions/prompt-snippets/index.ts",
       "./extensions/web-fetch/index.ts",
       "./extensions/web-search/index.ts"
     ],
-    "skills": ["./skills"],
+    "skills": [
+      "./skills"
+    ],
     "prompts": []
   },
   "files": [
@@ -67,13 +76,14 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "@types/node": "^22.10.0"
+    "@types/node": "^22.10.0",
+    "ajv": "^8.20.0",
+    "typescript": "^5.7.2"
   },
   "scripts": {
     "test": "node scripts/run-tests.mjs",
     "typecheck": "tsc --noEmit",
-    "scan": "node scripts/scan-secrets.mjs && node scripts/scan-personal.mjs",
+    "scan": "node scripts/scan-secrets.mjs && node scripts/scan-personal.mjs && node scripts/check-context-budget.mjs",
     "smoke": "node scripts/smoke-install.mjs"
   }
 }

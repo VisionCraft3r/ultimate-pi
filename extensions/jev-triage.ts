@@ -2,8 +2,14 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { Type } from "typebox";
 import { isContinuationCrumb, normalizePrompt } from "../lib/continuation-crumbs.ts";
 import { resolveOpenRouterApiKey } from "../lib/openrouter-auth.ts";
-import { resolveJevEndpoint, resolveJevModel } from "../lib/jev-config.ts";
+import { jevFailureReason, jevRequestSignal, resolveJevEndpoint, resolveJevModel } from "../lib/jev-config.ts";
 import { formatHeuristicTriage } from "../lib/jev-heuristic.ts";
+import { formatVerification, verificationFromChoice, type Verification } from "../lib/jev-verify.ts";
+import { traceEvent } from "../lib/trace.ts";
+
+function noteTriage(source: string, tier: string, confidence?: number): void {
+  traceEvent("jev-triage", { source, tier, confidence: confidence ?? null });
+}
 
 const CONTINUATION_PREFIX =
   /^(alright|all right|one more|also[, ]|instead |note |now,|now what|ok so |and also)\b/;
@@ -49,11 +55,12 @@ function minConfidenceFor(choice: string): number {
   return 50;
 }
 
-function triageText(choice: string, confidencePct: number): string {
+function triageText(choice: string, confidencePct: number, verification: Verification): string {
+  const check = formatVerification(verification);
   if (confidencePct < minConfidenceFor(choice)) {
-    return `Triage Result: ${choice}. WARNING: Low confidence (${confidencePct}%). Orchestrator MUST use ask_question to verify this tier.`;
+    return `Triage Result: ${choice}. WARNING: Low confidence (${confidencePct}%). Orchestrator MUST use ask_question to verify this tier. ${check}`;
   }
-  return `Triage Result: ${choice} (Confidence: ${confidencePct}%). Proceed with AGENTS.md routing.`;
+  return `Triage Result: ${choice} (Confidence: ${confidencePct}%). ${check} Proceed with AGENTS.md routing.`;
 }
 
 const CONTINUATION_FOCUS = "If prior_request is set, treat `request` as a continuation of that work unless `request` clearly starts a new job. Short ship/proceed crumbs without a new feature are the same job. Do not guess line counts, file counts, or repo layout. Tool launch, provider-key, and spawn-engine errors are configuration talk, not a project-file edit. 'I have a bug' / an agent cannot click or upload is investigation of existing product code, not a QA session.";
@@ -72,7 +79,7 @@ const TRIAGE_QUESTIONS = {
     criteria: {
       true: {
         what: "The user wants a code audit, project audit, security review, adversarial review, or a review of a PR or diff, and the deliverable is findings rather than a spec or a code change.",
-        not_for: "Writing or approving a spec, a named fix, a bug hunt, a how-to, or driving a running UI. Those stay on their current tiers and the reviewer is appended there.",
+        not_for: "Writing or approving a spec, a named fix, a bug hunt, a how-to, or driving a running UI. Those stay on their current tiers. A code change is not automatically a code review.",
         examples: [
           "audit the auth module",
           "project audit",
@@ -184,6 +191,51 @@ const TRIAGE_QUESTIONS = {
       },
     },
   },
+  verification: {
+    type: "choice",
+    instructions: {
+      question: "After the code change, which extra check does `request` need beyond the tests a worker already runs?",
+      focus: "Workers run tests without being asked. Do not pick reviewer because code will change. Pick reviewer only for security, billing, migration, data-loss, or an explicit review of the change. Pick browser when proof is operating a running UI. Pick scout when proof is re-reading core logic. Otherwise tests.",
+    },
+    criteria: {
+      tests: {
+        what: "The worker's own runnable check is the verification. No extra agent.",
+        not_for: "A UI that must be operated, a logic re-read, or a security/billing/migration review.",
+        examples: [
+          "fix the typo in src/auth.ts line 40",
+          "rename getUser to fetchUser in api.ts",
+          "the TypeError on line 88 of webhook.ts",
+        ],
+      },
+      scout: {
+        what: "Someone must re-read the changed logic and say whether it matches the brief. Not a line-by-line code review.",
+        not_for: "A typo, a running UI, or a security review.",
+        examples: [
+          "make sure the retry calculation is right",
+          "verify the invariant in the scheduler",
+          "double-check the core logic of the discount math",
+        ],
+      },
+      browser: {
+        what: "The proof is operating a running page, button, or screen after the change.",
+        not_for: "A logic-only fix, a typo, or a read-only audit.",
+        examples: [
+          "when I click submit nothing happens",
+          "the login button is broken",
+          "make sure it doesn't open a white page",
+        ],
+      },
+      reviewer: {
+        what: "The change can lose data, break a payment or auth boundary, migrate stored state, or the user asked for a review of the diff.",
+        not_for: "Ordinary fixes, UI checks, or logic re-reads. Tests and a scout cover those.",
+        examples: [
+          "fix the payment retry so we cannot double charge",
+          "review this change for data loss",
+          "the billing migration must not drop invoices",
+        ],
+      },
+    },
+  },
 } as const;
 
 const UI_TEST_NOUL_THRESHOLD = 0.75;
@@ -199,12 +251,15 @@ export default function (pi: ExtensionAPI) {
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       if (isContinuationCrumb(params.prompt)) {
-        return { content: [{ type: "text", text: triageText("tier_0", 100) }], details: {} };
+        noteTriage("crumb", "tier_0", 100);
+        return { content: [{ type: "text", text: triageText("tier_0", 100, "tests") }], details: {} };
       }
 
       const apiKey = resolveOpenRouterApiKey();
       if (!apiKey) {
-        return { content: [{ type: "text", text: formatHeuristicTriage(params.prompt) }], details: {} };
+        const text = formatHeuristicTriage(params.prompt);
+        noteTriage("heuristic", text.match(/Triage Result: (tier_[\w]+)/)?.[1] ?? "unknown");
+        return { content: [{ type: "text", text }], details: {} };
       }
 
       const prior = shouldAttachPrior(params.prompt)
@@ -225,7 +280,8 @@ export default function (pi: ExtensionAPI) {
             model: resolveJevModel(),
             state,
             questions: TRIAGE_QUESTIONS
-          })
+          }),
+          signal: jevRequestSignal(signal),
         });
 
         if (!response.ok) throw new Error(`API returned HTTP ${response.status}`);
@@ -238,7 +294,8 @@ export default function (pi: ExtensionAPI) {
         const noulConfident = noulConf === undefined || noulConf >= UI_TEST_CONFIDENCE_THRESHOLD;
         if (noul >= UI_TEST_NOUL_THRESHOLD && noulConfident) {
           const confidencePct = Math.round((noulConf ?? noul) * 100);
-          return { content: [{ type: "text", text: triageText("tier_4_qa", confidencePct) }], details: {} };
+          noteTriage("live", "tier_4_qa", confidencePct);
+          return { content: [{ type: "text", text: triageText("tier_4_qa", confidencePct, "browser") }], details: {} };
         }
 
         const review = data.answers?.is_code_review;
@@ -247,18 +304,28 @@ export default function (pi: ExtensionAPI) {
         const reviewConfident = reviewConf === undefined || reviewConf >= UI_TEST_CONFIDENCE_THRESHOLD;
         if (reviewNoul >= UI_TEST_NOUL_THRESHOLD && reviewConfident) {
           const confidencePct = Math.round((reviewConf ?? reviewNoul) * 100);
-          return { content: [{ type: "text", text: triageText("tier_5_review", confidencePct) }], details: {} };
+          noteTriage("live", "tier_5_review", confidencePct);
+          return { content: [{ type: "text", text: triageText("tier_5_review", confidencePct, "reviewer") }], details: {} };
         }
 
         if (!answer || !answer.choice) {
-          return { content: [{ type: "text", text: formatHeuristicTriage(params.prompt, { unavailableReason: "malformed API response" }) }], details: {} };
+          const text = formatHeuristicTriage(params.prompt, { unavailableReason: "malformed API response" });
+          noteTriage("heuristic", text.match(/Triage Result: (tier_[\w]+)/)?.[1] ?? "unknown");
+          return { content: [{ type: "text", text }], details: {} };
         }
 
         const confidencePct = Math.round((answer.confidence || 0) * 100);
-        return { content: [{ type: "text", text: triageText(answer.choice, confidencePct) }], details: {} };
+        const verifyAnswer = data.answers?.verification;
+        const verifyChoice = typeof verifyAnswer?.choice === "string" ? verifyAnswer.choice : undefined;
+        const verifyConf = typeof verifyAnswer?.confidence === "number" ? verifyAnswer.confidence : undefined;
+        const verification = verificationFromChoice(answer.choice, verifyChoice, verifyConf);
+        noteTriage("live", answer.choice, confidencePct);
+        return { content: [{ type: "text", text: triageText(answer.choice, confidencePct, verification) }], details: {} };
       } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: "text", text: formatHeuristicTriage(params.prompt, { unavailableReason: `network error: ${reason}` }) }], details: {} };
+        const reason = jevFailureReason(err);
+        const text = formatHeuristicTriage(params.prompt, { unavailableReason: reason });
+        noteTriage(reason === "timeout" ? "timeout" : "heuristic", text.match(/Triage Result: (tier_[\w]+)/)?.[1] ?? "unknown");
+        return { content: [{ type: "text", text }], details: {} };
       }
     }
   });

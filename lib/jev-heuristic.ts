@@ -4,6 +4,7 @@
  */
 
 import { isContinuationCrumb, normalizePrompt } from "./continuation-crumbs.ts";
+import { classifyVerification, formatVerification } from "./jev-verify.ts";
 
 export type HeuristicTier = "tier_0" | "tier_1" | "tier_2" | "tier_3" | "tier_4_qa" | "tier_5_review";
 
@@ -32,11 +33,12 @@ export function minConfidenceFor(choice: string): number {
   return 50;
 }
 
-export function formatTriageResult(choice: string, confidencePct: number): string {
+export function formatTriageResult(choice: string, confidencePct: number, prompt = ""): string {
+  const verification = formatVerification(classifyVerification(prompt, choice));
   if (confidencePct < minConfidenceFor(choice)) {
-    return `Triage Result: ${choice}. WARNING: Low confidence (${confidencePct}%). Orchestrator MUST use ask_question to verify this tier.`;
+    return `Triage Result: ${choice}. WARNING: Low confidence (${confidencePct}%). Orchestrator MUST use ask_question to verify this tier. ${verification}`;
   }
-  return `Triage Result: ${choice} (Confidence: ${confidencePct}%). Proceed with AGENTS.md routing.`;
+  return `Triage Result: ${choice} (Confidence: ${confidencePct}%). ${verification} Proceed with AGENTS.md routing.`;
 }
 
 export function classifyHeuristic(prompt: string): { tier: HeuristicTier; confidence: number } {
@@ -79,5 +81,5 @@ export function formatHeuristicTriage(
   const prefix = options?.unavailableReason
     ? formatUnavailablePrefix(options.unavailableReason)
     : HEURISTIC_UNCONFIGURED_PREFIX;
-  return `${prefix}\n${formatTriageResult(tier, confidence)}`;
+  return `${prefix}\n${formatTriageResult(tier, confidence, prompt)}`;
 }

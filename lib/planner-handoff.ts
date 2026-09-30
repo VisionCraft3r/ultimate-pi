@@ -12,6 +12,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { reviewPlanInBrowser } from "./plan-review.ts";
+import { traceEvent } from "./trace.ts";
 
 const PARK_TEXT =
   /parked for review|decision-complete|## Open Questions|no workers (were )?dispatched/i;
@@ -169,6 +170,7 @@ export function installPlannerHandoff(pi: ExtensionAPI): void {
           const review = await reviewPlanInBrowser(planPath, agentDir);
           if (!review.approved) {
             const reason = review.feedback?.trim() || review.error || "Plan was not approved.";
+            traceEvent("spec-handoff", { approved: false, path: params.path });
             return {
               content: [
                 {
@@ -184,6 +186,7 @@ export function installPlannerHandoff(pi: ExtensionAPI): void {
         }
         const question = formatHandoffQuestion(params);
         writeAskSidecar(question);
+        traceEvent("spec-handoff", { approved: true, path: params.path });
         fired = true;
         return {
           content: [
