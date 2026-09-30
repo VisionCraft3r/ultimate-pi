@@ -1,0 +1,48 @@
+diff --git a/extensions/graft.ts b/extensions/graft.ts
+--- a/extensions/graft.ts
++++ b/extensions/graft.ts
+@@ -58,6 +58,14 @@
+ const ASK_TIMEOUT_MS = 6_000;
+ /** How long a prompt may wait for retrieval before it is sent without it. */
+ const ASK_BUDGET_MS = 1_500;
++/** Subagents already have a task. This replaces the orientation message, which they were answering instead. */
++const SUBAGENT_TASK_NOTE =
++  "The user message is the task, including text inside a <file> tag. Do not call graft_repo_map unless the task asks for a repo map.";
++
++function isSubagentProcess(): boolean {
++  return Boolean(process.env.PI_SUBAGENT_AGENT?.trim());
++}
++
+ const CHECK_TIMEOUT_MS = 8_000;
+ /** Background structural rebuild budget (mirrors graft's sync-run). */
+ const BUILD_TIMEOUT_MS = 120_000;
+@@ -595,10 +603,13 @@
+     const cwd = ctx.cwd;
+     if (!hasGraph(cwd)) return;
+     const out: { message?: any; systemPrompt?: string } = {};
++    const subagent = isSubagentProcess();
+ 
+-    // 1 · orientation (once per session).
++    // 1 · orientation (once per session). A subagent's task arrives as a
++    // <file> message; this orientation was the next message and models
++    // treated "map alone is the answer" as the assignment.
+     const okey = `${sid(ctx)}@${cwd}`;
+-    if (!oriented.has(okey)) {
++    if (!subagent && !oriented.has(okey)) {
+       oriented.add(okey);
+       try {
+         const idx = readFileSync(indexPath(cwd), "utf8");
+@@ -634,6 +645,13 @@
+         }
+       }
+     } catch { /* retrieval is advisory — never fail the turn */ }
++
++    if (subagent) {
++      const base = out.systemPrompt ?? (event as any)?.systemPrompt ?? ctx.getSystemPrompt();
++      if (!String(base).includes(SUBAGENT_TASK_NOTE)) {
++        out.systemPrompt = `${base}\n\n${SUBAGENT_TASK_NOTE}`;
++      }
++    }
+ 
+     if (out.message || out.systemPrompt) return out;
+   });

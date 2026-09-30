@@ -44,7 +44,18 @@ This keeps snapshots valid when a provider embeds a newline in a tool id
 
 ### Intended behavior
 
-`graft ask` and `graft check` no longer run through `execFileSync` on the prompt, edit, or settle paths. A prompt waits at most 1.5s for retrieval and is sent without it if graft is slower. Drift checks after an edit and at settle update stats in the background. Continuation crumbs skip retrieval, matching jev-triage. A checksum that is not the published preimage or this post-image is left untouched.
+`graft ask` and `graft check` no longer run through `execFileSync` on the prompt, edit, or settle paths. A prompt waits at most 1.5s for retrieval and is sent without it if graft is slower. Drift checks after an edit and at settle update stats in the background. Continuation crumbs skip retrieval, matching jev-triage. A checksum that is not the published preimage or this post-image is left untouched. Once `pi-graft-subagent-task.patch` is applied, this file's hash is that patch's post-image, and this patch counts as already applied.
+
+## `pi-graft-subagent-task.patch`
+
+| | |
+| --- | --- |
+| Package | [`pi-graft`](https://www.npmjs.com/package/pi-graft) **0.1.2** |
+| Target file | `extensions/graft.ts` |
+| Pre-image SHA-256 | `11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e` |
+| Post-image SHA-256 | `0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4` |
+
+Applies after the async patch. In a subagent (`PI_SUBAGENT_AGENT`), graft does not append the orientation message. That message was the next turn after the task file, and the worker answered it with `graft_repo_map` and then exited. The task line is added to the system prompt instead: the user message, including text inside a `<file>` tag, is the task. Parent sessions still get the orientation message.
 
 ## `pi-cursor-idle-0.5.2.patch`
 

@@ -27,6 +27,16 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     patch: "pi-graft-async-0.1.2.patch",
     before: "663479e235ac247211f64e5d6015995d8cff04e33726fc639eaa0b1edfe5e6bb",
     after: "11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e",
+    supersededBy: "0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4",
+  },
+  {
+    name: "pi-graft",
+    version: "0.1.2",
+    root: "npm/node_modules/pi-graft",
+    target: "extensions/graft.ts",
+    patch: "pi-graft-subagent-task.patch",
+    before: "11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e",
+    after: "0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4",
   },
   {
     name: "pi-interactive-subagents",
@@ -71,7 +81,7 @@ export async function inspectDependencyPatch(agentDir, descriptor) {
     return { status: "skipped", reason: `expected ${descriptor.name}@${descriptor.version}; found ${manifest.name ?? "unknown"}@${manifest.version ?? "unknown"}` };
   }
   const sha256 = createHash("sha256").update(bytes).digest("hex");
-  if (sha256 === descriptor.after) return { status: "already-applied", target, sha256 };
+  if (sha256 === descriptor.after || sha256 === descriptor.supersededBy) return { status: "already-applied", target, sha256 };
   if (sha256 === descriptor.before) return { status: "ready", target, sha256 };
   return { status: "skipped", reason: `target checksum mismatch for ${descriptor.name}@${descriptor.version}` };
 }

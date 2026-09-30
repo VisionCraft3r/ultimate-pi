@@ -39,12 +39,18 @@ async function writeFixture(agentDir: string, { version = DESCRIPTOR.version, bo
 }
 
 test("pi-graft async patch is pinned to the published 0.1.2 preimage", () => {
-  const graft = DEPENDENCY_PATCHES.find((entry) => entry.name === "pi-graft");
+  const graft = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-graft-async-0.1.2.patch");
+  const follow = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-graft-subagent-task.patch");
   assert.ok(graft);
+  assert.ok(follow);
   assert.equal(graft.version, "0.1.2");
   assert.equal(graft.target, "extensions/graft.ts");
   assert.equal(graft.before, "663479e235ac247211f64e5d6015995d8cff04e33726fc639eaa0b1edfe5e6bb");
   assert.equal(graft.after, "11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e");
+  assert.equal(follow.before, graft.after);
+  assert.equal(follow.after, "0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4");
+  assert.equal(graft.supersededBy, follow.after);
+  assert.ok(DEPENDENCY_PATCHES.indexOf(follow) > DEPENDENCY_PATCHES.indexOf(graft));
 });
 
 test("ready when target matches the before hash", async () => {
@@ -55,6 +61,22 @@ test("ready when target matches the before hash", async () => {
     assert.equal(result.status, "ready");
     assert.equal(result.sha256, DESCRIPTOR.before);
     assert.equal(result.target, await realpath(path.join(agentDir, DESCRIPTOR.root, DESCRIPTOR.target)));
+  } finally {
+    await rm(agentDir, { recursive: true, force: true });
+  }
+});
+
+test("a follow-up post-image counts as the earlier patch already applied", async () => {
+  const agentDir = await makeAgentDir();
+  try {
+    await writeFixture(agentDir, { body: AFTER });
+    const result = await inspectDependencyPatch(agentDir, {
+      ...DESCRIPTOR,
+      after: sha256("later-after\n"),
+      supersededBy: sha256(AFTER),
+    });
+    assert.equal(result.status, "already-applied");
+    assert.equal(result.sha256, sha256(AFTER));
   } finally {
     await rm(agentDir, { recursive: true, force: true });
   }
