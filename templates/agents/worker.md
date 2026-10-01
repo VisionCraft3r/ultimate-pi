@@ -3,7 +3,7 @@ name: worker
 description: General-purpose worker — reads, writes, and edits code ({{providerLabel}})
 model: {{model}}
 thinking: {{thinking}}
-tools: jev_sentinel, read, write, edit, bash, grep, find, ls
+tools: jev_sentinel, read, write, edit, bash, grep, find, ls, session_chrome
 subagent_agents: scout, researcher
 system-prompt: append
 auto-exit: true

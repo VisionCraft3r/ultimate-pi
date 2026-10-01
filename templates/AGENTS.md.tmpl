@@ -115,7 +115,9 @@ Maximize prompt-cache hits: keep the stable prefix (system prompt, context files
 
 Every subagent launches with `--no-extensions` and, when its profile lists `tools:`, an explicit `--tools` allowlist. A profile that omits `tools:` gets no `--tools` flag and inherits the full default toolset — always list them. Grantable tool names are only:
 
-`read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, `web_search`, `web_fetch`, `safe_bash`, `video_extract`, `youtube_search`, `google_image_search`, `jev_sentinel`, `handoff_spec`, `ask_user_question`, `browser_goto`, `browser_click`, `browser_eval`, `browser_fill`, `browser_screenshot`, `browser_console`, `browser_network`
+`read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, `web_search`, `web_fetch`, `safe_bash`, `video_extract`, `youtube_search`, `google_image_search`, `jev_sentinel`, `handoff_spec`, `ask_user_question`, `session_chrome`, `browser_goto`, `browser_click`, `browser_eval`, `browser_fill`, `browser_screenshot`, `browser_console`, `browser_network`
+
+`session_chrome` is hidden. It is listed so each child pane loads its own context bar. Do not call it.
 
 Write `tools:` as a comma-separated line with no brackets. YAML arrays (`tools: [a, b]`) are parsed as literal tokens (`[a` / `b]`) and silently drop those tools.
 

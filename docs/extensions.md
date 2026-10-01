@@ -92,6 +92,10 @@ Set `ULTIMATE_PI_TRACE=1`, or `"ultimatePiTrace": true` in `<agentDir>/settings.
 
 `pi-context-view` is required and parent-only. `/context` inspects the prompt. It adds no model instructions. `@lucascardozo/pi-edit-guard` is required and is loaded only on child agents that already have `edit` or `write`.
 
+### `session-chrome`
+
+A two-line widget above the editor: a context bar (`ctx.getContextUsage()`, warning above 70%, error above 90%) and a one-line git dirty summary (branch, shortstat, untracked files). The parent and each subagent pane paint their own bar from that process. Children start with `--no-extensions`, so every profile lists the hidden tool `session_chrome` and this file re-injects itself with `registerToolExtension`. The model cannot call it. `/chrome` hides or shows the lines for that pane. `/chrome refresh` updates the git line. It does not replace Pi's footer.
+
 ### `custom-header`
 
 Replaces Pi's startup banner with the Ultimate Pi logo. `/builtin-header` restores the stock header for the session.

@@ -3,7 +3,7 @@ name: researcher
 description: Web ingestion — scrapes and synthesizes external docs to a file, returns the path ({{providerLabel}})
 model: {{model}}
 thinking: {{thinking}}
-tools: web_search, web_fetch, write, safe_bash
+tools: web_search, web_fetch, write, safe_bash, session_chrome
 system-prompt: append
 auto-exit: true
 ---

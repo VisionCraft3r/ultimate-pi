@@ -3,7 +3,7 @@ name: planner
 description: Architectural planner — drafts specs and waits for human approval ({{providerLabel}})
 model: {{model}}
 thinking: {{thinking}}
-tools: read, write, edit, grep, find, ls, handoff_spec, ask_user_question
+tools: read, write, edit, grep, find, ls, handoff_spec, ask_user_question, session_chrome
 subagent_agents: scout, researcher
 system-prompt: append
 auto-exit: false

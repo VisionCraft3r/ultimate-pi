@@ -3,7 +3,7 @@ name: scout
 description: Reconnaissance compressor — locates logic, returns dense file/line maps ({{providerLabel}})
 model: {{model}}
 thinking: {{thinking}}
-tools: read, grep, find, ls
+tools: read, grep, find, ls, session_chrome
 system-prompt: append
 auto-exit: true
 ---

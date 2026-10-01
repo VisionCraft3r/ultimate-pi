@@ -20,6 +20,7 @@ export const GRANTABLE_TOOLS = [
 	"jev_sentinel",
 	"handoff_spec",
 	"ask_user_question",
+	"session_chrome",
 	"browser_goto",
 	"browser_click",
 	"browser_eval",

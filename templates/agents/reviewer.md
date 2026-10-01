@@ -3,7 +3,7 @@ name: reviewer
 description: Read-only code reviewer — verdict and findings, no edits ({{providerLabel}})
 model: {{model}}
 thinking: {{thinking}}
-tools: read, grep, find, ls
+tools: read, grep, find, ls, session_chrome
 system-prompt: append
 auto-exit: true
 ---

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Session chrome.** A widget above the editor shows that pane's context bar (warning above 70%, error above 90%) and a one-line git dirty summary. `/chrome` hides or shows it for that pane. `/chrome refresh` updates the git line. The parent and each subagent paint their own bar. Children load it because every profile lists the hidden tool `session_chrome`. Pi's footer is unchanged. Extension files apply on `/reload`. Already installed profiles pick up `session_chrome` from `ultimate-pi setup agents`, or from the next spawn after that tool is on the profile.
+
 - **JEV verification choice.** The same triage call now returns `Verification: tests | scout | browser | reviewer`. A worker wave no longer always gets a code reviewer. Tests are the default. A low-confidence verification answer stays on tests.
 
 - **JEV deadline.** Live triage and sentinel calls abort after `ULTIMATE_PI_JEV_TIMEOUT_MS` (default 8s) or when the tool is cancelled, then fall through to the heuristic with a visible timeout or cancelled warning.
