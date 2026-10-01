@@ -31,6 +31,18 @@ Extension changes apply on `/reload`. The managed routing block and agent profil
 
 - **`reviewer` role.** Read-only sixth agent with its own model assignment. `tier_1`, `tier_2`, and `tier_3` keep their current first role, then one reviewer covers the worker wave. `tier_5_review` is a JEV noul for a code audit, project audit, security review, or PR/diff review and starts with the reviewer. Blocking findings on an implementation tier repair for up to two rounds. An audit that only asks for findings stops at the report. Existing installs get `agents/reviewer.md` from `ultimate-pi setup agents` or a new install, not from a package update alone. An answers file that omits `reviewer` copies the planner assignment into a separate entry.
 
+## [1.2.0-alpha] — 2026-10-01
+
+Checked on Pi 0.99.2. That release does not change extension commands or flag parsing: a flag registered by an extension that is not loaded is still an unknown option, and the process exits before the child starts.
+
+### Added
+
+- **`/agents`.** Lists every profile in `agents/*.md` with its model and thinking level, including profiles the installer does not manage. Change either field from the menu, or with `/agents <name> model <provider/id>` and `/agents <name> thinking <level>`. The new values apply the next time that agent is spawned.
+
+### Fixed
+
+- **Scout launch.** Scout no longer receives `--no-lens-context`. That flag is registered by pi-lens, which scout does not load, so Pi exited with "Unknown option" before the child wrote a session. An already patched launcher drops the flag on the next Ultimate PI update. pi-lens stays off scout. Scout still keeps `graft_find_code` and `graft_repo_map`.
+
 ## [1.1.0-alpha] — 2026-09-28
 
 ### Added

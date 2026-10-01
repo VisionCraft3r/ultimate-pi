@@ -180,13 +180,15 @@ Ultimate Pi does not install a video-ad role. A profile already at
 `agents/video-ads.md` is left in place. The next `ultimate-pi setup agents`
 rewrites the managed routing block and stops assigning that role.
 
-Scout launches with `--no-lens-context`. pi-lens is not attached to scout.
-Scout keeps `graft_find_code` and `graft_repo_map`. Its session-start and turn-end notes are not written into
-scout's prompt. Worker and planner do not get that flag. Worker has no
+pi-lens is not attached to scout. Scout keeps `graft_find_code` and
+`graft_repo_map`. Its session-start and turn-end notes are not written into
+scout's prompt. Worker and planner keep the full tool lists. Worker has no
 tool-round ceiling.
 
-Change assignments any time with `ultimate-pi setup agents` or the in-Pi
-`/ModelAgents` command.
+Change a role's model or thinking level with the in-Pi `/agents` command.
+That writes `agents/<name>.md` and applies the next time that role is spawned.
+`/ModelAgents` still edits 429 fallback chains. `ultimate-pi setup agents`
+re-renders the managed profiles from installer answers.
 
 ### Fallback models
 
@@ -295,7 +297,9 @@ Flags:
   -h, --help           Show this help
 ```
 
-In-Pi commands: `/ModelAgents` (edit agent models and fallback chains),
+In-Pi commands: `/agents` (list every agent and change its model or thinking
+level; applies on the next spawn), `/ModelAgents` (edit fallback chains and
+rescan Cursor models),
 `/bash-guard`, `/jobs` (list background pids; `/jobs kill <pid>` stops a
 recorded pid and its children), `/context` (parent session), `/browser`,
 `/snippets`, `/builtin-header`, and `/cache` / `/om` if those optional

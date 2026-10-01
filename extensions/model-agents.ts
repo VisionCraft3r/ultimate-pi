@@ -13,15 +13,11 @@ import {
   AGENT_NAMES,
   type AgentName,
   FALLBACK_PROVIDERS,
-  appendEnabledModel,
   cursorScanAvailable,
   formatChain,
   formatNewModels,
   listConfiguredProviders,
-  orderModelRefs,
-  pickerLabel,
   readAgentModel,
-  readEnabledModels,
   resolveFallbackChain,
   scanCursorModels,
   splitModelRef,
@@ -29,40 +25,7 @@ import {
   writeAgentModel,
   writeFallbackChain,
 } from "../lib/model-agents.ts";
-
-function scopedRefs(ctx: ExtensionContext): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const fromSession = (ctx.scopedModels ?? []).map((scoped) => `${scoped.model.provider}/${scoped.model.id}`);
-  for (const ref of [...readEnabledModels(), ...fromSession]) {
-    const key = ref.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(ref);
-  }
-  return out;
-}
-
-function availableRefs(ctx: ExtensionContext): string[] {
-  const models = [
-    ...(ctx.modelRegistry.getAvailable?.() ?? []),
-    ...(ctx.modelRegistry.getAll?.() ?? []),
-  ];
-  return models.map((model) => `${model.provider}/${model.id}`);
-}
-
-async function pickModel(ctx: ExtensionContext, title: string): Promise<string | undefined> {
-  const ordered = orderModelRefs(scopedRefs(ctx), availableRefs(ctx));
-  if (ordered.length === 0) {
-    ctx.ui.notify("No models in the registry. Reload after providers are configured.", "warning");
-    return undefined;
-  }
-  const labels = ordered.map((entry) => pickerLabel(entry.ref, entry.scoped));
-  const choice = await ctx.ui.select(title, labels);
-  if (!choice) return undefined;
-  const index = labels.indexOf(choice);
-  return index >= 0 ? ordered[index]?.ref : undefined;
-}
+import { pickModel } from "../lib/model-picker.ts";
 
 async function assignAgent(ctx: ExtensionContext): Promise<void> {
   const rows = AGENT_NAMES.map((agent) => {

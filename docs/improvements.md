@@ -62,7 +62,7 @@ An older v6 version can be refreshed with `npx --yes bmad-method@latest install 
 
 A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one chance to return the file and line map. A 21st round is blocked. Worker is unchanged. The ceiling is also written in `templates/agents/scout.md`.
 
-Scout launches with `--no-lens-context`, and pi-lens is not attached to that child. Scout keeps `graft_find_code` and `graft_repo_map`. The rest of the graft and pi-lens tool lists stay on worker and planner. A child's thinking level is passed with `--thinking`, not glued onto the model id.
+pi-lens is not attached to scout, and the scout launch does not pass `--no-lens-context`. That flag is registered by pi-lens, so passing it while pi-lens is unloaded makes Pi exit with "Unknown option" before the child starts. Scout keeps `graft_find_code` and `graft_repo_map`. The rest of the graft and pi-lens tool lists stay on worker and planner. A child's thinking level is passed with `--thinking`, not glued onto the model id.
 
 ## Quota switches stay inside the models you enabled
 

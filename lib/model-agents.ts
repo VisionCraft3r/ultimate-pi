@@ -9,18 +9,13 @@
  * both exist — otherwise it is skipped silently (no proxy running).
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getAgentDir } from "./agent-dir.ts";
 
-export const AGENT_DIR = getAgentDir();
-const SCAN_PATH = join(AGENT_DIR, "cursor-model-scan.json");
-const CACHE_PATH = join(AGENT_DIR, "cursor-model-cache.json");
-const PROXY_PATH = join(AGENT_DIR, "cursor-proxy.json");
-const AUTH_PATH = join(AGENT_DIR, "auth.json");
-const SETTINGS_PATH = join(AGENT_DIR, "settings.json");
-const ASSIGNMENTS_PATH = join(AGENT_DIR, "model-agents.json");
-const AGENTS_MD_PATH = join(AGENT_DIR, "AGENTS.md");
+function inAgent(name: string): string {
+  return join(getAgentDir(), name);
+}
 
 /** Marker comments the AGENTS.md table edits must stay inside. */
 export const AGENTS_MD_BEGIN_MARKER = "<!-- ultimate-pi:begin -->";
@@ -28,6 +23,18 @@ export const AGENTS_MD_END_MARKER = "<!-- ultimate-pi:end -->";
 
 export const AGENT_NAMES = ["scout", "worker", "planner", "researcher", "qa_tester", "reviewer"] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
+
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
+export type AgentProfile = {
+  name: string;
+  model?: string;
+  thinking?: string;
+  description?: string;
+};
+
+const AGENT_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 /** Default provider ordering used only when no chain is configured. Caller supplies real defaults via deriveDefaultChains(). */
 export const FALLBACK_PROVIDERS = ["anthropic", "openai-codex", "cursor", "openai", "openrouter", "deepseek"] as const;
@@ -69,7 +76,7 @@ function modelIds(models: unknown): string[] {
 }
 
 function readScanState(): ScanState {
-  const raw = readJson(SCAN_PATH);
+  const raw = readJson(inAgent("cursor-model-scan.json"));
   if (!raw || typeof raw !== "object") return {};
   const state = raw as ScanState;
   return {
@@ -87,21 +94,21 @@ export function scanDue(now = Date.now()): boolean {
 }
 
 function proxyPort(): number | undefined {
-  const raw = readJson(PROXY_PATH);
+  const raw = readJson(inAgent("cursor-proxy.json"));
   if (!raw || typeof raw !== "object") return undefined;
   const port = (raw as { port?: unknown }).port;
   return typeof port === "number" && port > 0 ? port : undefined;
 }
 
 function hasCursorCredentials(): boolean {
-  const raw = readJson(AUTH_PATH);
+  const raw = readJson(inAgent("auth.json"));
   if (!raw || typeof raw !== "object") return false;
   return Boolean((raw as Record<string, unknown>).cursor);
 }
 
 /** Cursor catalog scan preconditions: credentials AND a live proxy descriptor file. */
 export function cursorScanAvailable(): boolean {
-  return hasCursorCredentials() && existsSync(PROXY_PATH);
+  return hasCursorCredentials() && existsSync(inAgent("cursor-proxy.json"));
 }
 
 async function fetchCatalog(port: number): Promise<unknown[] | undefined> {
@@ -127,7 +134,7 @@ async function fetchCatalog(port: number): Promise<unknown[] | undefined> {
 function baselineIds(): string[] {
   const saved = readScanState().ids;
   if (saved && saved.length > 0) return saved;
-  return modelIds(readJson(CACHE_PATH));
+  return modelIds(readJson(inAgent("cursor-model-cache.json")));
 }
 
 export async function scanCursorModels(options?: { force?: boolean }): Promise<ScanResult> {
@@ -140,10 +147,10 @@ export async function scanCursorModels(options?: { force?: boolean }): Promise<S
   const ids = modelIds(models);
   const known = new Set(baselineIds());
   const added = ids.filter((id) => !known.has(id)).map((id) => `cursor/${id}`);
-  mkdirSync(AGENT_DIR, { recursive: true });
-  writeFileSync(CACHE_PATH, JSON.stringify(models));
+  mkdirSync(getAgentDir(), { recursive: true });
+  writeFileSync(inAgent("cursor-model-cache.json"), JSON.stringify(models));
   const state: ScanState = { lastSuccess: new Date().toISOString(), ids };
-  writeFileSync(SCAN_PATH, `${JSON.stringify(state, null, 2)}\n`);
+  writeFileSync(inAgent("cursor-model-scan.json"), `${JSON.stringify(state, null, 2)}\n`);
   return { status: "ok", added, total: ids.length };
 }
 
@@ -174,7 +181,7 @@ export function pickerLabel(ref: string, scoped: boolean): string {
 }
 
 export function readEnabledModels(): string[] {
-  const raw = readJson(SETTINGS_PATH);
+  const raw = readJson(inAgent("settings.json"));
   if (!raw || typeof raw !== "object") return [];
   const list = (raw as { enabledModels?: unknown }).enabledModels;
   if (!Array.isArray(list)) return [];
@@ -203,8 +210,9 @@ export function insertEnabledModelText(text: string, modelRef: string): string |
 }
 
 /** Append provider/id to settings.json enabledModels. Returns whether it was new. */
-export function appendEnabledModel(modelRef: string): boolean {
-  const text = readFileSync(SETTINGS_PATH, "utf8");
+export function appendEnabledModel(modelRef: string, root = getAgentDir()): boolean {
+  const settingsPath = join(root, "settings.json");
+  const text = readFileSync(settingsPath, "utf8");
   const next = insertEnabledModelText(text, modelRef);
   if (next === undefined) {
     let settings: { enabledModels?: unknown };
@@ -220,15 +228,59 @@ export function appendEnabledModel(modelRef: string): boolean {
       ...list.filter((entry): entry is string => typeof entry === "string"),
       modelRef,
     ];
-    writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`);
+    writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
     return true;
   }
-  writeFileSync(SETTINGS_PATH, next);
+  writeFileSync(settingsPath, next);
   return true;
 }
 
-function agentPath(agent: AgentName): string {
-  return join(AGENT_DIR, "agents", `${agent}.md`);
+function assertAgentFileName(agent: string): void {
+  if (!AGENT_FILE_NAME.test(agent)) throw new Error(`invalid agent name: ${agent}`);
+}
+
+function agentPath(agent: string, root = getAgentDir()): string {
+  assertAgentFileName(agent);
+  return join(root, "agents", `${agent}.md`);
+}
+
+export function assertThinkingLevel(level: string): ThinkingLevel {
+  if (!(THINKING_LEVELS as readonly string[]).includes(level)) {
+    throw new Error(`invalid thinking level "${level}". One of: ${THINKING_LEVELS.join(", ")}`);
+  }
+  return level as ThinkingLevel;
+}
+
+/** Profiles in agents/*.md. Sidecar copies named *.ultimate-pi.md are skipped. */
+export function listAgentProfiles(root = getAgentDir()): AgentProfile[] {
+  let names: string[];
+  try {
+    names = readdirSync(join(root, "agents"));
+  } catch {
+    return [];
+  }
+  const profiles: AgentProfile[] = [];
+  for (const file of names.sort()) {
+    if (!file.endsWith(".md") || file.endsWith(".ultimate-pi.md")) continue;
+    const name = file.slice(0, -".md".length);
+    if (!AGENT_FILE_NAME.test(name)) continue;
+    let text: string;
+    try {
+      text = readFileSync(join(root, "agents", file), "utf8");
+    } catch {
+      continue;
+    }
+    if (!text.startsWith("---")) continue;
+    const end = text.indexOf("\n---", 3);
+    const head = end < 0 ? text : text.slice(0, end);
+    profiles.push({
+      name,
+      model: head.match(/^model:\s*(\S+)/m)?.[1],
+      thinking: head.match(/^thinking:\s*(\S+)/m)?.[1],
+      description: head.match(/^description:\s*(.+)$/m)?.[1]?.trim(),
+    });
+  }
+  return profiles;
 }
 
 export function readAgentModel(agent: AgentName): string | undefined {
@@ -243,14 +295,28 @@ export function readAgentModel(agent: AgentName): string | undefined {
   }
 }
 
-export function replaceModelLine(markdown: string, modelRef: string): string | undefined {
-  if (!markdown.startsWith("---")) return undefined;
+/** Replace a frontmatter field, or insert it before the closing ---. */
+export function replaceFrontmatterField(
+  markdown: string,
+  key: "model" | "thinking",
+  value: string,
+): string | undefined {
+  if (!markdown.startsWith("---") || !value || /\s/.test(value)) return undefined;
   const end = markdown.indexOf("\n---", 3);
   if (end < 0) return undefined;
   const head = markdown.slice(0, end);
-  if (!/^model:\s*\S+/m.test(head)) return undefined;
-  if (!modelRef) return head + markdown.slice(end);
-  return head.replace(/^model:\s*\S+/m, `model: ${modelRef}`) + markdown.slice(end);
+  const line = new RegExp(`^${key}:\\s*\\S+`, "m");
+  if (line.test(head)) return head.replace(line, `${key}: ${value}`) + markdown.slice(end);
+  return `${head}\n${key}: ${value}${markdown.slice(end)}`;
+}
+
+export function replaceModelLine(markdown: string, modelRef: string): string | undefined {
+  if (!modelRef) {
+    if (!markdown.startsWith("---")) return undefined;
+    if (markdown.indexOf("\n---", 3) < 0) return undefined;
+    return markdown;
+  }
+  return replaceFrontmatterField(markdown, "model", modelRef);
 }
 
 /** Slice out the ultimate-pi-managed region of AGENTS.md (between the markers), or undefined if absent. */
@@ -276,20 +342,34 @@ export function replaceAgentModelCell(markdown: string, agent: string, modelRef:
   );
 }
 
-export function writeAgentModel(agent: AgentName, modelRef: string): { enabledAdded: boolean } {
-  const path = agentPath(agent);
+export function writeAgentModel(agent: string, modelRef: string, root = getAgentDir()): { enabledAdded: boolean } {
+  const path = agentPath(agent, root);
   const text = readFileSync(path, "utf8");
   const next = replaceModelLine(text, modelRef);
-  if (!next) throw new Error(`no model: line in agents/${agent}.md`);
+  if (!next) throw new Error(`no frontmatter in agents/${agent}.md`);
   writeFileSync(path, next);
-  const agentsMd = readFileSync(AGENTS_MD_PATH, "utf8");
-  const updated = replaceAgentModelCell(agentsMd, agent, modelRef);
-  if (updated !== agentsMd) writeFileSync(AGENTS_MD_PATH, updated);
-  return { enabledAdded: appendEnabledModel(modelRef) };
+  const agentsMdPath = join(root, "AGENTS.md");
+  try {
+    const agentsMd = readFileSync(agentsMdPath, "utf8");
+    const updated = replaceAgentModelCell(agentsMd, agent, modelRef);
+    if (updated !== agentsMd) writeFileSync(agentsMdPath, updated);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+  return { enabledAdded: appendEnabledModel(modelRef, root) };
+}
+
+export function writeAgentThinking(agent: string, level: string, root = getAgentDir()): void {
+  const thinking = assertThinkingLevel(level);
+  const path = agentPath(agent, root);
+  const text = readFileSync(path, "utf8");
+  const next = replaceFrontmatterField(text, "thinking", thinking);
+  if (!next) throw new Error(`no frontmatter in agents/${agent}.md`);
+  writeFileSync(path, next);
 }
 
 function readAssignments(): AssignmentsFile {
-  const raw = readJson(ASSIGNMENTS_PATH);
+  const raw = readJson(inAgent("model-agents.json"));
   if (!raw || typeof raw !== "object") return {};
   return raw as AssignmentsFile;
 }
@@ -356,13 +436,13 @@ export function resolveScopedSwitchChain(
 export function writeFallbackChain(provider: string, chain: ModelRef[]): void {
   const current = readAssignments();
   const fallbacks = { ...(current.fallbacks ?? {}), [provider]: chain };
-  writeFileSync(ASSIGNMENTS_PATH, `${JSON.stringify({ ...current, fallbacks }, null, 2)}\n`);
+  writeFileSync(inAgent("model-agents.json"), `${JSON.stringify({ ...current, fallbacks }, null, 2)}\n`);
 }
 
 export function writeAgentFallbackChain(agentName: string, chain: ModelRef[]): void {
   const current = readAssignments();
   const agentFallbacks = { ...(current.agentFallbacks ?? {}), [agentName]: chain };
-  writeFileSync(ASSIGNMENTS_PATH, `${JSON.stringify({ ...current, agentFallbacks }, null, 2)}\n`);
+  writeFileSync(inAgent("model-agents.json"), `${JSON.stringify({ ...current, agentFallbacks }, null, 2)}\n`);
 }
 
 export function formatChain(chain: ModelRef[]): string {
@@ -384,7 +464,7 @@ export function splitModelRef(ref: string): ModelRef | undefined {
  */
 export function listConfiguredProviders(): string[] {
   const providers = new Set<string>();
-  const auth = readJson(AUTH_PATH);
+  const auth = readJson(inAgent("auth.json"));
   if (auth && typeof auth === "object") {
     for (const key of Object.keys(auth as Record<string, unknown>)) providers.add(key);
   }

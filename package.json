@@ -1,6 +1,6 @@
 {
   "name": "ultimate-pi",
-  "version": "1.1.0-alpha",
+  "version": "1.2.0-alpha",
   "description": "Multi-agent routing for the Pi CLI.",
   "type": "module",
   "license": "MIT",
@@ -23,6 +23,7 @@
       "./extensions/jev-sentinel.ts",
       "./extensions/quota-fallback.ts",
       "./extensions/model-agents.ts",
+      "./extensions/agent-config.ts",
       "./extensions/planner-handoff.ts",
       "./extensions/custom-header.ts",
       "./extensions/ask-user-question.ts",

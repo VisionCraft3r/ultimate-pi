@@ -24,11 +24,15 @@ Does not embed a fixed list of model ids.
 
 ### `scout-budget`
 
-Caps `scout` at 20 tool rounds. A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one more turn to return the file and line map. A 21st round is blocked. The extension no-ops unless `PI_SUBAGENT_AGENT` is `scout`, so worker is unchanged. Install passes `--no-lens-context` on the scout launch only, and does not attach the pi-lens tool list to scout. Scout keeps `graft_find_code` and `graft_repo_map`. Worker and planner keep the full lists. A child's thinking level is a `--thinking` flag, not a suffix on the model id.
+Caps `scout` at 20 tool rounds. A round is one assistant message that contains tool calls. Round 20 still runs. Scout then gets one more turn to return the file and line map. A 21st round is blocked. The extension no-ops unless `PI_SUBAGENT_AGENT` is `scout`, so worker is unchanged. The scout launch does not load pi-lens and does not pass `--no-lens-context` (that flag only exists when pi-lens is loaded, and passing it makes the child exit immediately). Scout keeps `graft_find_code` and `graft_repo_map`. Worker and planner keep the full lists. A child's thinking level is a `--thinking` flag, not a suffix on the model id.
+
+### `agent-config`
+
+`/agents` lists every `agents/*.md` profile (managed roles and any extra profile such as `video-ads`; `*.ultimate-pi.md` sidecars are skipped) with its `model:` and `thinking:`. Pick one to change the model, the thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`), or both. `/agents list` prints the same table. `/agents <name> model <provider/id>` and `/agents <name> thinking <level>` skip the menus. Scoped models are listed first. A model missing from the registry, or a thinking level above `off` on a model that does not reason, is saved and called out. The write updates that profile and, when the name is in the managed table, the cell inside the `<!-- ultimate-pi:begin/end -->` block. It applies the next time that agent is spawned. A running pane is left alone. The command does nothing in a subagent session.
 
 ### `model-agents`
 
-`/ModelAgents` edits the six role models and the 429 chains, and rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md`.
+`/ModelAgents` edits 429 fallback chains (global per provider, and a per-agent override) and can rescan the Cursor catalog. It rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md` when it assigns one of the six managed roles. Use `/agents` to change what a role runs.
 
 ### `planner-handoff`
 

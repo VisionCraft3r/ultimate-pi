@@ -70,7 +70,7 @@ flowchart TB
 
 At most three worker panes run at once. The reviewer does not count toward that cap. Each of `scout`, `worker`, `planner`, `researcher`, `qa_tester`, and `reviewer` gets its own tmux pane. The orchestrator stays in the original session and talks to those panes; it does not share a process with them.
 
-Scout launches with `--no-lens-context` and `extensions/scout-budget.ts`. A tool round is one assistant message that contains tool calls. Round 20 still runs, then scout has one chance to return the file and line map, and a 21st round is blocked. pi-lens is not attached to scout. Scout keeps `graft_find_code` and `graft_repo_map`. Worker and planner keep the full tool lists and do not get the flag. Worker is not capped. Child thinking levels use `--thinking` and are not glued onto the model id.
+Scout launches with `extensions/scout-budget.ts` and without pi-lens. A tool round is one assistant message that contains tool calls. Round 20 still runs, then scout has one chance to return the file and line map, and a 21st round is blocked. Scout keeps `graft_find_code` and `graft_repo_map`. Worker and planner keep the full tool lists. Worker is not capped. Child thinking levels use `--thinking` and are not glued onto the model id. `/agents` writes `model:` and `thinking:` on the next spawn; a running pane keeps the model it started with.
 
 Background processes left by an allowed bash command are recorded under `<agentDir>/jobs`. `/jobs kill <pid>` stops a recorded pid and its children. Worker can start those processes. qa_tester can kill them and cannot start them. The parent session can do both.
 
