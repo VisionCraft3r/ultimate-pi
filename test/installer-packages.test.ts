@@ -354,14 +354,14 @@ const SANDBOX_FIXTURE = `    for (const extPath of extPaths) {
 }
 `;
 
-test("scout child launch adds the lens flag only inside the sandbox loop", () => {
+test("scout child launch adds the budget inside the sandbox loop and not the lens flag", () => {
   const missing = ensureScoutChildLaunch("export function launch() { return true; }\n");
   assert.equal(missing.status, "skipped");
 
   const applied = ensureScoutChildLaunch(SANDBOX_FIXTURE);
   assert.equal(applied.status, "applied");
   assert.match(applied.source, /loadout\.agent === "scout"/);
-  assert.match(applied.source, /--no-lens-context/);
+  assert.doesNotMatch(applied.source, /--no-lens-context/);
   assert.match(applied.source, /scout-budget\.ts/);
   assert.match(applied.source, /loadout\.agent === "qa_tester"/);
   assert.match(applied.source, /qa-budget\.ts/);
@@ -377,8 +377,21 @@ test("a launcher that already has the scout branch gains the QA cap", () => {
   const upgraded = ensureScoutChildLaunch(scoutOnly);
   assert.equal(upgraded.status, "applied");
   assert.match(upgraded.source, /qa-budget\.ts/);
-  assert.match(upgraded.source, /--no-lens-context/);
+  assert.doesNotMatch(upgraded.source, /--no-lens-context/);
   assert.equal(ensureScoutChildLaunch(upgraded.source).status, "already-applied");
+});
+
+test("an installed launcher loses --no-lens-context", () => {
+  const old = ensureScoutChildLaunch(SANDBOX_FIXTURE).source.replace(
+    'if (loadout.agent === "scout") {\n',
+    'if (loadout.agent === "scout") {\n      parts.push("--no-lens-context");\n',
+  );
+  assert.match(old, /--no-lens-context/);
+  const migrated = ensureScoutChildLaunch(old);
+  assert.equal(migrated.status, "applied");
+  assert.doesNotMatch(migrated.source, /--no-lens-context/);
+  assert.match(migrated.source, /scout-budget\.ts/);
+  assert.equal(ensureScoutChildLaunch(migrated.source).status, "already-applied");
 });
 
 const THINKING_FIXTURE = `    const model = loadout.thinking ? \`\${loadout.model}:\${loadout.thinking}\` : loadout.model;

@@ -18,12 +18,13 @@ const LOOP_NEEDLE = `    for (const extPath of extPaths) {
 }`;
 
 const SCOUT_BLOCK = `    if (loadout.agent === "scout") {
-      parts.push("--no-lens-context");
       if (loadout.agentDir) {
         const scoutBudget = join(loadout.agentDir, "extensions", "scout-budget.ts");
         if (existsSync(scoutBudget)) parts.push("-e", shellEscape(scoutBudget));
       }
     }`;
+
+const LENS_FLAG_LINE = `      parts.push("--no-lens-context");\n`;
 
 const QA_BLOCK = `    if (loadout.agent === "qa_tester") {
       if (loadout.agentDir) {
@@ -68,16 +69,41 @@ const DIET_CALL = "const context = contextExtensionsForChild(granted);";
 const DIET_CALL_NEXT = "const context = contextExtensionsForChild(granted, loadout.agent);";
 
 /**
- * Scout children skip pi-lens prompt injection and load the tool-round cap.
+ * Drop `--no-lens-context` from a launcher that already has the scout branch.
+ * That flag is registered by pi-lens, and scout starts with `--no-extensions`
+ * and without pi-lens, so Pi exits with "Unknown option" before the child runs.
+ * pi-lens is already left off the scout tool diet, so the flag does nothing.
+ * @param {string} source
+ */
+export function stripScoutLensFlag(source) {
+  if (!source.includes('parts.push("--no-lens-context")')) {
+    return { status: "already-applied", source };
+  }
+  if (!source.includes(LENS_FLAG_LINE) || source.split(LENS_FLAG_LINE).length !== 2) {
+    return { status: "skipped", reason: "lens flag not in the expected shape", source };
+  }
+  return { status: "applied", source: source.replace(LENS_FLAG_LINE, "") };
+}
+
+/**
+ * Scout children skip pi-lens and load the tool-round cap.
  * QA children load the same kind of cap. No-op when the sandbox loop is absent
  * or both branches are already there. A launcher that already has the scout
- * branch gains the QA branch.
+ * branch gains the QA branch. A launcher that still passes `--no-lens-context`
+ * loses that flag.
  * @param {string} source
  */
 export function ensureScoutChildLaunch(source) {
-  const hasScout = source.includes('parts.push("--no-lens-context")') && source.includes("scout-budget.ts");
+  const stripped = stripScoutLensFlag(source);
+  if (stripped.status === "skipped") return stripped;
+  source = stripped.source;
+  const hasScout = source.includes('loadout.agent === "scout"') && source.includes("scout-budget.ts");
   const hasQa = source.includes("qa-budget.ts");
-  if (hasScout && hasQa) return { status: "already-applied", source };
+  if (hasScout && hasQa) {
+    return stripped.status === "applied"
+      ? { status: "applied", source }
+      : { status: "already-applied", source };
+  }
   if (hasScout) {
     if (!source.includes(SCOUT_BLOCK)) {
       return { status: "skipped", reason: "scout branch not in the expected shape", source };
