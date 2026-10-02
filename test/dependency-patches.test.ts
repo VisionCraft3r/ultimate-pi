@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { DEPENDENCY_PATCHES, inspectDependencyPatch } from "../installer/dependency-patches.mjs";
+import { DEPENDENCY_PATCHES, dependencyPatchApplies, inspectDependencyPatch } from "../installer/dependency-patches.mjs";
 
 const BEFORE = "fixture-before\n";
 const AFTER = "fixture-after\n";
@@ -159,4 +159,110 @@ test("skips when a package-root symlink escapes agentDir", async () => {
   } finally {
     await rm(parent, { recursive: true, force: true });
   }
+});
+
+test("dependency patches apply only to the package being installed", () => {
+  const graft = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-graft-settled-stale-0.1.2.patch");
+  const memory = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-observational-memory-observer-stale.patch");
+  const cursor = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-cursor-stale-ctx-0.5.2.patch");
+  assert.ok(graft && memory && cursor);
+  assert.equal(graft.before, "db3eef0b520bebaf0afe9457e7013c431676793ea00cf20fdeb5aaf9965e4d1d");
+  assert.equal(graft.after, "e3f2684791d8d44fc909d84a887f58996001307be71bb3fdb10fbead5dfc6bdb");
+  assert.equal(dependencyPatchApplies(graft, ["npm:pi-graft"]), true);
+  assert.equal(dependencyPatchApplies(graft, ["npm:@schultzp2020/pi-cursor"]), false);
+  assert.equal(dependencyPatchApplies(memory, ["git:github.com/amosblomqvist/pi-observational-memory"]), true);
+  assert.equal(dependencyPatchApplies(memory, ["npm:pi-graft"]), false);
+  assert.equal(dependencyPatchApplies(cursor, ["npm:@schultzp2020/pi-cursor"]), true);
+  assert.equal(dependencyPatchApplies(cursor, ["npm:pi-graft"]), false);
+});
+
+test("pi-graft workspace-stats patch chains after stale-ctx and aggregates child graphs", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const stale = DEPENDENCY_PATCHES.find((e) => e.patch === "pi-graft-stale-ctx-0.1.2.patch");
+  const ws = DEPENDENCY_PATCHES.find((e) => e.patch === "pi-graft-workspace-stats-0.1.2.patch");
+  assert.ok(stale && ws);
+  assert.equal(ws.before, stale.after);
+  assert.equal(stale.supersededBy, ws.after);
+  assert.ok(DEPENDENCY_PATCHES.indexOf(ws) > DEPENDENCY_PATCHES.indexOf(stale));
+  const patch = await readFile(new URL("../patches/pi-graft-workspace-stats-0.1.2.patch", import.meta.url), "utf8");
+  for (const needle of ["workspace.json", "resolveWorkspaceStats", "no graph: "]) assert.ok(patch.includes(needle), needle);
+});
+
+async function loadWorkspaceStats() {
+  const { readFile } = await import("node:fs/promises");
+  const patch = await readFile(new URL("../patches/pi-graft-workspace-stats-0.1.2.patch", import.meta.url), "utf8");
+  const added = patch.split("\n").filter((l) => l.startsWith("+") && !l.startsWith("+++")).map((l) => l.slice(1));
+  const text = added.join("\n");
+  const fnStart = text.indexOf("function workspaceChildren");
+  const fnEnd = text.indexOf("  const ws = resolveWorkspaceStats(d);");
+  const noteStart = text.indexOf("const wsInfo");
+  assert.ok(fnStart >= 0 && fnEnd > fnStart && noteStart >= 0);
+  const helpers = text.slice(fnStart, fnEnd);
+  const note = text.slice(noteStart, text.indexOf('        : "";', noteStart) + '        : "";'.length);
+  const src = `import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
+const contextDir = (d: string) => join(d, "graft");
+const wiringPath = (d: string) => join(contextDir(d), ".graph", "wiring.json");
+function readJson<T>(p: string): T | null { try { return JSON.parse(readFileSync(p, "utf8")) as T; } catch { return null; } }
+function readWiring(d: string): any { return readJson(wiringPath(d)); }
+function emptyStats(): any { return { nodeCount: 0, edgeCount: 0, languages: [], totalCount: 0, readyCount: 0 }; }
+${helpers}
+export { resolveWorkspaceStats };
+export function noteFor(cwd: string): string {
+${note}
+  return wsNote;
+}
+`;
+  const dir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-ws-"));
+  const file = path.join(dir, "ws.ts");
+  await writeFile(file, src);
+  return { dir, mod: await import(file) };
+}
+
+async function child(root: string, name: string, wiring: unknown) {
+  const g = path.join(root, name, "graft", ".graph");
+  await mkdir(g, { recursive: true });
+  if (wiring) await writeFile(path.join(g, "wiring.json"), JSON.stringify(wiring));
+}
+
+const wiring = (n: number, e: number, lang: string) => ({
+  meta: { nodeCount: n, edgeCount: e, languages: [lang] },
+  nodes: Array.from({ length: n }, (_, i) => ({ id: `n${i}`, name: "x", kind: "f", summary_state: i === 0 ? "ready" : "none" })),
+  edges: [],
+});
+
+test("workspace stats: two ready children aggregate and report N/M", async () => {
+  const { dir, mod } = await loadWorkspaceStats();
+  await mkdir(path.join(dir, "graft"), { recursive: true });
+  await writeFile(path.join(dir, "graft", "workspace.json"), JSON.stringify({ version: 1, children: ["a", "b"] }));
+  await child(dir, "a", wiring(3, 5, "typescript"));
+  await child(dir, "b", wiring(2, 1, "python"));
+  const r = mod.resolveWorkspaceStats(dir);
+  assert.equal(r.stats.nodeCount, 5);
+  assert.equal(r.stats.edgeCount, 6);
+  assert.equal(r.stats.readyCount, 2);
+  assert.deepEqual([...r.stats.languages].sort(), ["python", "typescript"]);
+  assert.equal(r.total, 2);
+  assert.deepEqual(r.missing, []);
+  assert.equal(mod.noteFor(dir), " [workspace 2/2]");
+});
+
+test("workspace stats: missing child is labeled; all missing yields null (no graph)", async () => {
+  const { dir, mod } = await loadWorkspaceStats();
+  await mkdir(path.join(dir, "graft"), { recursive: true });
+  await writeFile(path.join(dir, "graft", "workspace.json"), JSON.stringify({ children: ["a", "b"] }));
+  await child(dir, "a", wiring(3, 5, "typescript"));
+  const r = mod.resolveWorkspaceStats(dir);
+  assert.equal(r.stats.nodeCount, 3);
+  assert.deepEqual(r.missing, ["b"]);
+  assert.equal(mod.noteFor(dir), " [workspace 1/2; no graph: b]");
+  await rm(path.join(dir, "a", "graft", ".graph", "wiring.json"));
+  assert.equal(mod.resolveWorkspaceStats(dir), null);
+});
+
+test("workspace stats: ordinary repo without workspace.json is untouched", async () => {
+  const { dir, mod } = await loadWorkspaceStats();
+  await child(dir, ".", wiring(4, 4, "typescript"));
+  assert.equal(mod.resolveWorkspaceStats(dir), null);
+  assert.equal(mod.noteFor(dir), "");
 });

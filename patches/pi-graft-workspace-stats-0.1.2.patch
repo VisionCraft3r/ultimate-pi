@@ -1,0 +1,57 @@
+--- a/extensions/graft.ts
++++ b/extensions/graft.ts
+@@ -285,7 +285,39 @@
+ 
+ /** Statusline fast path: hook-maintained cache first, wiring graph as fallback
+  *  (a fresh `graft build` doesn't write the cache), null only when unbuilt. */
++function workspaceChildren(d: string): string[] | null {
++  const ws = readJson<{ children?: unknown }>(join(contextDir(d), "workspace.json"));
++  if (!ws || !Array.isArray(ws.children)) return null;
++  const kids = ws.children.filter((c): c is string => typeof c === "string" && c.length > 0);
++  return kids.length ? kids : null;
++}
++
++/** Workspace parent: aggregate child graphs; `missing` lists children without one. */
++function resolveWorkspaceStats(d: string): { stats: Stats; total: number; missing: string[] } | null {
++  const kids = workspaceChildren(d);
++  if (!kids) return null;
++  const agg = emptyStats();
++  const langs = new Set<string>();
++  const missing: string[] = [];
++  for (const kid of kids) {
++    const kidDir = isAbsolute(kid) ? kid : join(d, kid);
++    const w = readWiring(kidDir);
++    if (!w) { missing.push(kid); continue; }
++    const nodes = w.nodes ?? [];
++    agg.nodeCount += w.meta?.nodeCount ?? nodes.length;
++    agg.edgeCount += w.meta?.edgeCount ?? (w.edges ?? []).length;
++    agg.totalCount += nodes.length;
++    agg.readyCount += nodes.filter((n) => n.summary_state === "ready").length;
++    for (const l of w.meta?.languages ?? []) langs.add(l);
++  }
++  if (missing.length === kids.length) return null;
++  agg.languages = [...langs];
++  return { stats: agg, total: kids.length, missing };
++}
++
+ function resolveStats(d: string): Stats | null {
++  const ws = resolveWorkspaceStats(d);
++  if (ws) return ws.stats;
+   const cached = readStats(d);
+   if (cached && cached.nodeCount > 0) return cached;
+   const w = readWiring(d);
+@@ -580,9 +612,13 @@
+         ctx.ui.setStatus("graft", `graft ${version}: no graph — run graft build`);
+         return;
+       }
++      const wsInfo = resolveWorkspaceStats(cwd);
++      const wsNote = wsInfo
++        ? ` [workspace ${wsInfo.total - wsInfo.missing.length}/${wsInfo.total}${wsInfo.missing.length ? `; no graph: ${wsInfo.missing.join(", ")}` : ""}]`
++        : "";
+       let session: SessionState | null = null;
+       try { session = readSession(cwd, ctx.sessionManager.getSessionId()); } catch { /* ignore */ }
+-      ctx.ui.setStatus("graft", `graft ${version}: ${renderStatusline(stats, session)}`);
++      ctx.ui.setStatus("graft", `graft ${version}: ${renderStatusline(stats, session)}${wsNote}`);
+     } catch { /* status must never fail the turn */ }
+   }
+ 

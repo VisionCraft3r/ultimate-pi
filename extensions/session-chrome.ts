@@ -17,6 +17,7 @@ import {
 	type ContextLevel,
 	type GitSnapshot,
 } from "../lib/session-chrome.ts";
+import { isReplacedSessionError } from "../lib/stale-session.ts";
 
 const THIS_FILE = fileURLToPath(import.meta.url);
 const WIDGET_ID = "session-chrome";
@@ -62,6 +63,15 @@ export default function sessionChrome(pi: ExtensionAPI) {
 	});
 
 	function paint(ctx: ExtensionContext) {
+		try {
+			paintLive(ctx);
+		} catch (error) {
+			if (isReplacedSessionError(error)) return;
+			throw error;
+		}
+	}
+
+	function paintLive(ctx: ExtensionContext) {
 		if (!ctx.hasUI || ctx.mode !== "tui") return;
 		if (hidden) {
 			ctx.ui.setWidget(WIDGET_ID, undefined);
@@ -81,8 +91,15 @@ export default function sessionChrome(pi: ExtensionAPI) {
 	}
 
 	function refreshGit(ctx: ExtensionContext): Promise<void> {
+		let cwd: string;
+		try {
+			cwd = ctx.cwd;
+		} catch (error) {
+			if (isReplacedSessionError(error)) return Promise.resolve();
+			throw error;
+		}
 		const token = ++refresh;
-		return readGitSnapshot(ctx.cwd)
+		return readGitSnapshot(cwd)
 			.then((next) => {
 				if (token !== refresh) return;
 				git = next;

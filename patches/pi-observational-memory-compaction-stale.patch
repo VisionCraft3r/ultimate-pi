@@ -1,0 +1,30 @@
+diff --git a/src/hooks/compaction-trigger.ts b/src/hooks/compaction-trigger.ts
+--- a/src/hooks/compaction-trigger.ts
++++ b/src/hooks/compaction-trigger.ts
+@@ -58,8 +58,15 @@ function turnWillContinue(event: any): boolean {
+  * turn (option A; no agent-invisible resume exists through the public API). A `turn_end` that
+  * was the run's terminal turn is left to stop, exactly as if no compaction had happened.
+  */
++
++function replacedSession(error: unknown): boolean {
++	const text = error instanceof Error ? error.message : String(error);
++	return text.includes("stale after session replacement or reload");
++}
++
+ export function registerCompactionTrigger(pi: ExtensionAPI, runtime: Runtime): void {
+ 	pi.on("turn_end", (event: any, ctx: any) => {
++		try {
+ 		if (!runtime.enabled || runtime.config.passive) return;
+ 		if (runtime.compactInFlight) return;
+ 
+@@ -112,5 +119,10 @@ export function registerCompactionTrigger(pi: ExtensionAPI, runtime: Runtime): v
+ 				if (hasUI) ui?.notify(`om: ${error.message}`, "error");
+ 			},
+ 		});
++		} catch (error) {
++			const text = error instanceof Error ? error.message : String(error);
++			if (text.includes("stale after session replacement or reload")) return;
++			throw error;
++		}
+ 	});
+ }

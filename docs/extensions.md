@@ -18,9 +18,9 @@ Safety and state check for `worker` and `qa_tester` before destructive bash. Reg
 
 ### `quota-fallback`
 
-On HTTP 429, switches the current turn to the next hop in `model-agents.json` (per-agent override, then per-provider chain, then a derived default from configured providers). When `settings.json` `enabledModels` or the session scoped-model list is non-empty, the derived default is skipped and a written hop is used only if that `provider/id` is in the list. The switch lasts for the session and does not rewrite the agent's saved model. If every hop 429s, the error is reported.
+On a real quota signal — HTTP 429, rate-limit text, or the Anthropic extra-usage sentence — switches the current turn to the next hop in `model-agents.json` (per-agent override, then per-provider chain, then a derived default from configured providers). A Cursor connect `resource_exhausted` or "retries exhausted" is a dead proxy or a rejected model id, not an empty plan, and does not switch. When `settings.json` `enabledModels` or the session scoped-model list is non-empty, the derived default is skipped and a written hop is used only if that `provider/id` is in the list. The switch lasts for the session and does not rewrite the agent's saved model. If every hop 429s, the error is reported.
 
-Does not embed a fixed list of model ids.
+Does not embed a fixed list of model ids. After a session replacement the handler returns without reading the old context.
 
 ### `scout-budget`
 
@@ -32,7 +32,7 @@ Caps `scout` at 20 tool rounds. A round is one assistant message that contains t
 
 ### `model-agents`
 
-`/ModelAgents` edits 429 fallback chains (global per provider, and a per-agent override) and can rescan the Cursor catalog. It rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md` when it assigns one of the six managed roles. Use `/agents` to change what a role runs.
+`/ModelAgents` edits 429 fallback chains (global per provider, and a per-agent override) and can rescan the Cursor catalog. The daily scan and "Scan now" talk to the local Cursor proxy only when `cursor-proxy.json` names a pid that is still running. A successful scan writes `cursor-model-cache.json` and names any managed `cursor/...` assignment that is not in that catalog. New ids are registered by pi-cursor on the next `/reload`. It rewrites only the agent table inside the `<!-- ultimate-pi:begin/end -->` block of `AGENTS.md` when it assigns one of the six managed roles. Use `/agents` to change what a role runs.
 
 ### `planner-handoff`
 

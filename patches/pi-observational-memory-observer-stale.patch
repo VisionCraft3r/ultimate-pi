@@ -1,0 +1,53 @@
+diff --git a/src/hooks/observer-trigger.ts b/src/hooks/observer-trigger.ts
+--- a/src/hooks/observer-trigger.ts
++++ b/src/hooks/observer-trigger.ts
+@@ -24,6 +24,37 @@ type TriggerCtx = {
+ 	getContextUsage?: () => { tokens: number | null } | undefined;
+ };
+ 
++function replacedSession(error: unknown): boolean {
++	const text = error instanceof Error ? error.message : String(error);
++	return text.includes("stale after session replacement or reload");
++}
++
++/** Copy the getters once. A session Pi already replaced throws on every read. */
++function liveTrigger(ctx: TriggerCtx): TriggerCtx | undefined {
++	try {
++		const hasUI = ctx.hasUI;
++		const ui = ctx.ui;
++		const sessionManager = ctx.sessionManager;
++		const getContextUsage = ctx.getContextUsage;
++		return {
++			hasUI,
++			ui,
++			sessionManager,
++			getContextUsage: () => {
++				try {
++					return getContextUsage?.();
++				} catch (error) {
++					if (replacedSession(error)) return undefined;
++					throw error;
++				}
++			},
++		};
++	} catch (error) {
++		if (replacedSession(error)) return undefined;
++		throw error;
++	}
++}
++
+ let runCounter = 0;
+ 
+ /**
+@@ -69,8 +100,10 @@ function effectiveWatermarkId(runtime: Runtime, branch: Entry[]): string | undef
+  * backlog and concurrency for. Pure dispatch: each observer is awaited inside its own async
+  * task tracked in `runtime.observersInFlight`, never blocking the event handler.
+  */
+-export function evaluateObserverTriggers(pi: ExtensionAPI, runtime: Runtime, ctx: TriggerCtx): void {
++export function evaluateObserverTriggers(pi: ExtensionAPI, runtime: Runtime, incoming: TriggerCtx): void {
+ 	if (!runtime.enabled || runtime.config.passive) return;
++	const ctx = liveTrigger(incoming);
++	if (!ctx) return;
+ 
+ 	const hasUI = ctx.hasUI;
+ 	const ui = ctx.ui;

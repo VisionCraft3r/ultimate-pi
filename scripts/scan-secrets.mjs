@@ -45,6 +45,7 @@ const ALLOWED_BARE_HEX = new Set([
   // async + subagent-task patches, then the stale-ctx patch (SHA-256).
   publicHex("0e80c4207393e90cd862514cc6e4ef3c5", "b0cf925a770f89cc2b32c7b277503a4"),
   publicHex("0f9002d52221f57fbbcd0bf6d1f5e123f", "94532eed49a9e051efd0bc55cd91f51"),
+  publicHex("db3eef0b520bebaf0afe9457e7013c43", "1676793ea00cf20fdeb5aaf9965e4d1d"),
   // Reproduced from github.com/amosblomqvist/pi-interactive-subagents
   // at the pinned commit above: pi-extension/subagents/index.ts, before/after
   // pi-interactive-subagents-stale-ctx.patch. First pair: git blob ids;
@@ -53,6 +54,15 @@ const ALLOWED_BARE_HEX = new Set([
   publicHex("2266f5a7a8e82aa9c358", "ec39a7dd53420ebf38f1"),
   publicHex("0a438726c0a9e5bd02d0b87141b41238", "aae7c39ac2faa4f4a96eb0f5e1ecb1a4"),
   publicHex("96dfdb1d722fcb6a478ccf919aae698b5", "f6f2fe6b770145aeca6acb21f711136"),
+  // pi-graft settled-handler stale-ctx post-image, and observational-memory
+  // 0.1.0 observer/consolidator/compaction trigger before/after images.
+  publicHex("e3f2684791d8d44fc909d84a887f5899", "6001307be71bb3fdb10fbead5dfc6bdb"),
+  publicHex("0bfe292de9bfd3e95a48e7499f98401d", "69a07b4e4f77602f9cc27945fbd87db9"),
+  publicHex("f45758d173508b0384447d790531d401", "e29374e78b5472287f081eb67a24f8c0"),
+  publicHex("4594cd243c4a5aff2e11e057dd4b0431", "fd76fc1e6506c0695e57a7bc1229e121"),
+  publicHex("766634f8364569369ef7d78012363a7a", "a84ac679620b8f6db9436f6dee7dd061"),
+  publicHex("6d3e7abc671d8ed6d0c3706d3d74f027", "7e541038e35d03fadc11b2210edcf2d0"),
+  publicHex("cb757631b32a76f4a49fe6c11d2bde41", "bcd6d3bd172a7857bdc5c7ca0d1f2bc7"),
 ]);
 
 // Paperclip skill identifiers used as `key: "..."` in test fixtures. They look

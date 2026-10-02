@@ -36,10 +36,10 @@ Extension changes apply on `/reload`. The managed routing block and agent profil
 
 ### Fixed
 
-- **Replaced-session contexts.** Pinned, hash-checked patches protect Cursor 0.5.2, graft 0.1.2, and interactive-subagents 3.7.2 from stale context calls. See [patches/README.md](./patches/README.md) for targets, patch order, and image hashes.
+- **Replaced-session contexts.** Quota fallback, the verify gate, planner handoff, session chrome, and the iTerm2 status extra ignore a context Pi has already replaced. Hash-checked patches do the same for Cursor 0.5.2, graft 0.1.2 (including settle, tool, and prompt handlers), interactive-subagents 3.7.2, and observational-memory 0.1.0. Setup skips Pi's `turn_end` boundary error once that runner is stale. See [patches/README.md](./patches/README.md).
 - **Safe launch updates.** Checkout synchronization and package updates defer while subagents run; launch retries deferred checks up to four times at one-minute intervals. The Plannotator fresh-idle-session persistence guard is restored when its known source marker matches, with a warning if it does not.
 - **Sandboxed child display.** Children load the custom header without expanding their tool grants. Legacy combined stdout/stderr log redirects become stderr-only so the pane keeps its display, and launchers calling the viewer regain a missing viewer import.
-- **Quota continuation.** Short assistant-text `resource_exhausted` errors and the extra-usage-limit response trigger fallback, with a hold flag until continuation is scheduled. Temporary localhost debug-ingest requests have been removed; normal tracing remains opt-in.
+- **Quota continuation.** HTTP 429, rate-limit text, and the extra-usage-limit response trigger fallback, with a hold flag until continuation is scheduled. A Cursor connect `resource_exhausted` does not. Temporary localhost debug-ingest requests have been removed; normal tracing remains opt-in.
 
 ### Performance and routing
 

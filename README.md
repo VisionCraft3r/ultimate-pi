@@ -44,9 +44,9 @@ third party. See [NOTICE.md](./NOTICE.md) for full attribution.
 - **Tool allowlisting** — subagents launch with `--no-extensions` and an
   explicit `--tools` allowlist; nothing is inherited by accident.
 - **Cross-provider 429 fallback** — configurable per-provider and per-agent
-  fallback chains so a quota hit on one provider fails over automatically.
-  When `enabledModels` or the session scoped-model list is set, hops stay
-  inside that list.
+  fallback chains so a real quota hit on one provider fails over automatically.
+  A Cursor connect `resource_exhausted` does not count. When `enabledModels`
+  or the session scoped-model list is set, hops stay inside that list.
 - **Planner spec handoff** — `handoff_spec` opens the spec in the Plannotator
   browser, then parks with the `.ask` silent-park watchdog.
 - **bash-guard** — a safety net around destructive shell commands, including

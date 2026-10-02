@@ -11,6 +11,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { ifActiveSession } from "../../lib/stale-session.ts";
 
 export function resolveStatusBin(): string | undefined {
 	const fromEnv = process.env.ULTIMATE_PI_ITERM_STATUS_BIN?.trim();
@@ -19,7 +20,8 @@ export function resolveStatusBin(): string | undefined {
 }
 
 function lastAssistantText(ctx: ExtensionContext): string {
-	for (const entry of [...ctx.sessionManager.getEntries()].reverse()) {
+	const entries = ifActiveSession(() => ctx.sessionManager.getEntries(), []);
+	for (const entry of [...entries].reverse()) {
 		if (entry.type !== "message" || entry.message.role !== "assistant") continue;
 		const content = entry.message.content;
 		if (!Array.isArray(content)) return "";
@@ -39,10 +41,18 @@ function updateStatus(event: string, ctx: ExtensionContext, extra: Record<string
 	const bin = resolveStatusBin();
 	if (!bin) return Promise.resolve();
 
+	const fields = ifActiveSession(
+		() => ({
+			session_id: ctx.sessionManager.getSessionId(),
+			transcript_path: ctx.sessionManager.getSessionFile(),
+			cwd: ctx.cwd,
+		}),
+		undefined,
+	);
+	if (!fields) return Promise.resolve();
+
 	const payload = JSON.stringify({
-		session_id: ctx.sessionManager.getSessionId(),
-		transcript_path: ctx.sessionManager.getSessionFile(),
-		cwd: ctx.cwd,
+		...fields,
 		hook_event_name: event,
 		...extra,
 	});
@@ -74,7 +84,8 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("ui_prompt_end", async (_event, ctx) => {
-		await updateStatus(ctx.isIdle() ? "Stop" : "UserPromptSubmit", ctx, {
+		const idle = ifActiveSession(() => ctx.isIdle(), true);
+		await updateStatus(idle ? "Stop" : "UserPromptSubmit", ctx, {
 			last_assistant_message: lastAssistantText(ctx),
 		});
 	});

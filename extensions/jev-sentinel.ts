@@ -8,6 +8,7 @@ import { installSoftRoundNudge, WORKER_NUDGE_REASON, workerRoundNudgeLimit } fro
 import { VERIFY_GATE_REASON, lastAssistantText, verifyGateAction } from "../lib/verify-gate.ts";
 import { jevFailureReason, jevRequestSignal, resolveJevEndpoint, resolveJevModel } from "../lib/jev-config.ts";
 import { HEURISTIC_UNCONFIGURED_PREFIX, formatUnavailablePrefix } from "../lib/jev-heuristic.ts";
+import { isReplacedSessionError } from "../lib/stale-session.ts";
 
 const THIS_FILE = fileURLToPath(import.meta.url);
 
@@ -62,24 +63,29 @@ export default function (pi: ExtensionAPI) {
 
     let verifyNudged = false;
     pi.on("agent_before_settle", (event, ctx) => {
-      const settle = event as { outcome?: string; context?: { canContinue?: boolean; sessionManager?: { getEntries?: () => unknown[] } } };
-      if (settle.outcome !== "completed" || !settle.context?.canContinue) return;
-      const fromCtx = ctx as { sessionManager?: { getEntries?: () => unknown[] } } | undefined;
-      const session = fromCtx?.sessionManager?.getEntries ? fromCtx : settle.context;
-      const action = verifyGateAction(lastAssistantText(session), verifyNudged);
-      if (!action) return;
-      verifyNudged = true;
-      return {
-        continue: true,
-        entries: [
-          {
-            type: "custom_message" as const,
-            customType: "verify-gate",
-            content: VERIFY_GATE_REASON,
-            display: true,
-          },
-        ],
-      };
+      try {
+        const settle = event as { outcome?: string; context?: { canContinue?: boolean; sessionManager?: { getEntries?: () => unknown[] } } };
+        if (settle.outcome !== "completed" || !settle.context?.canContinue) return;
+        const fromCtx = ctx as { sessionManager?: { getEntries?: () => unknown[] } } | undefined;
+        const session = fromCtx?.sessionManager?.getEntries ? fromCtx : settle.context;
+        const action = verifyGateAction(lastAssistantText(session), verifyNudged);
+        if (!action) return;
+        verifyNudged = true;
+        return {
+          continue: true,
+          entries: [
+            {
+              type: "custom_message" as const,
+              customType: "verify-gate",
+              content: VERIFY_GATE_REASON,
+              display: true,
+            },
+          ],
+        };
+      } catch (error) {
+        if (isReplacedSessionError(error)) return;
+        throw error;
+      }
     });
   }
 

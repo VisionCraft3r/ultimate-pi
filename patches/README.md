@@ -113,3 +113,40 @@ The thinking idle window is 120 seconds, streaming idle is 60 seconds, and
 thinking output does not switch the timer phase until real text arrives.
 A locally modified build whose full-file hash differs is skipped, even if it
 already contains some of these changes.
+
+## `pi-graft-workspace-stats-0.1.2.patch`
+
+| | |
+| --- | --- |
+| Package | `pi-graft` **0.1.2** (target `extensions/graft.ts`) |
+| Pre-image SHA-256 | `0f9002d52221f57fbbcd0bf6d1f5e123f94532eed49a9e051efd0bc55cd91f51` |
+| Post-image SHA-256 | `db3eef0b520bebaf0afe9457e7013c431676793ea00cf20fdeb5aaf9965e4d1d` |
+
+When `graft/workspace.json` exists, footer stats aggregate the children's
+`graft/.graph/wiring.json` counts and append `[workspace N/M; no graph: …]`
+for children without a graph. Single repos behave as before.
+
+## `pi-graft-settled-stale-0.1.2.patch`
+
+| | |
+| --- | --- |
+| Package | `pi-graft` **0.1.2** (target `extensions/graft.ts`) |
+| Pre-image SHA-256 | `db3eef0b520bebaf0afe9457e7013c431676793ea00cf20fdeb5aaf9965e4d1d` |
+| Post-image SHA-256 | `e3f2684791d8d44fc909d84a887f58996001307be71bb3fdb10fbead5dfc6bdb` |
+
+Applies after the workspace-stats patch. `before_agent_start`, `tool_result`, and `agent_settled` read `ctx.cwd` inside a try/catch. A live session still tallies and refreshes graft. A context Pi has already replaced returns without failing the turn.
+
+## Observational memory stale context
+
+| | |
+| --- | --- |
+| Package | `observational-memory` **0.1.0** |
+| Commit the preimages were taken from | `78a1efcfdd46332253fb289724f05b26dfc7769e` |
+
+| Patch | Target | Pre-image | Post-image |
+| --- | --- | --- | --- |
+| `pi-observational-memory-observer-stale.patch` | `src/hooks/observer-trigger.ts` | `0bfe292de9bfd3e95a48e7499f98401d69a07b4e4f77602f9cc27945fbd87db9` | `f45758d173508b0384447d790531d401e29374e78b5472287f081eb67a24f8c0` |
+| `pi-observational-memory-consolidator-stale.patch` | `src/hooks/consolidator-trigger.ts` | `4594cd243c4a5aff2e11e057dd4b0431fd76fc1e6506c0695e57a7bc1229e121` | `766634f8364569369ef7d78012363a7aa84ac679620b8f6db9436f6dee7dd061` |
+| `pi-observational-memory-compaction-stale.patch` | `src/hooks/compaction-trigger.ts` | `6d3e7abc671d8ed6d0c3706d3d74f0277e541038e35d03fadc11b2210edcf2d0` | `cb757631b32a76f4a49fe6c11d2bde41bcd6d3bd172a7857bdc5c7ca0d1f2bc7` |
+
+Observer and consolidator copy the session getters once and return when Pi has already replaced the session. Compaction's `turn_end` handler does the same. A live session still dispatches workers and compacts. A checksum that is not the preimage or post-image is left untouched.

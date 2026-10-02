@@ -1,0 +1,33 @@
+diff --git a/extensions/graft.ts b/extensions/graft.ts
+--- a/extensions/graft.ts
++++ b/extensions/graft.ts
+@@ -638,7 +638,8 @@ export default function (pi: ExtensionAPI) {
+   // session (persistent message), gated retrieval pack every prompt (this
+   // turn's system prompt — per-turn context, never persisted history).
+   pi.on("before_agent_start", async (event, ctx) => {
+-    const cwd = ctx.cwd;
++    let cwd: string;
++    try { cwd = ctx.cwd; } catch { return; }
+     if (!hasGraph(cwd)) return;
+     const out: { message?: any; systemPrompt?: string } = {};
+     const subagent = isSubagentProcess();
+@@ -697,7 +698,8 @@ export default function (pi: ExtensionAPI) {
+   // PostToolUse savings hook (every tool) + post-edit hook (edit/write):
+   // shared counters, dirty marking, and inline blast radius.
+   pi.on("tool_result", async (event, ctx) => {
+-    const cwd = ctx.cwd;
++    let cwd: string;
++    try { cwd = ctx.cwd; } catch { return; }
+     if (!hasGraph(cwd)) return;
+     const ev = event as any;
+     const toolName: string = ev?.toolName ?? "";
+@@ -785,7 +787,8 @@ export default function (pi: ExtensionAPI) {
+   // Detached so it survives `-p` exits; the completion is recorded in the
+   // shared stats cache, which the next status refresh picks up.
+   pi.on("agent_settled", async (_event, ctx) => {
+-    const cwd = ctx.cwd;
++    let cwd: string;
++    try { cwd = ctx.cwd; } catch { return; }
+     if (!hasGraph(cwd) || syncing.has(cwd)) return;
+     // Orphaned flag from a previous process that died mid-build: clear it so
+     // the footer is truthful even when this turn makes no edits (!dirty).

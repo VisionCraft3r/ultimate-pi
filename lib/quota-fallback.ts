@@ -31,6 +31,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import { readEnabledModels, resolveScopedSwitchChain, type ModelRef } from "./model-agents.ts";
+import { ifActiveSession, isReplacedSessionError } from "./stale-session.ts";
 import { traceEvent } from "./trace.ts";
 
 /** Appended so Pi's isRetryableAssistantError returns false (quota exceeded + cancelled). */
@@ -72,17 +73,16 @@ export function isQuota429(status?: number, text?: string): boolean {
   if (status === 429) return true;
   const t = text ?? "";
   if (!t) return false;
+  // Cursor's connect layer uses resource_exhausted and "retries exhausted" for a
+  // rejected model id or a dead proxy. Those are not an empty subscription.
   return (
     /\b429\b/.test(t) ||
-    /rate_limit_error/i.test(t) ||
-    /exceed your account's rate limit/i.test(t) ||
-    /retry failed after \d+ attempts/i.test(t) ||
-    /resource_exhausted/i.test(t) ||
+    /rate[_\s-]?limit/i.test(t) ||
     /extra usage, not your plan limits/i.test(t)
   );
 }
 
-/** Cursor's connect layer puts resource_exhausted in assistant text with stopReason stop and no errorMessage. */
+/** Short assistant text that is itself a quota error. A connect failure is not. */
 export function quotaSignalFromMessage(message: unknown): string {
   if (!isObject(message)) return "";
   const err = typeof message.errorMessage === "string" ? message.errorMessage : "";
@@ -142,7 +142,7 @@ function lastAssistantFrom(messages: readonly unknown[] | undefined): QuotaAssis
 function lastAssistant(ctx: ExtensionContext, extra?: readonly unknown[]): QuotaAssistantMessage | undefined {
   const fromExtra = lastAssistantFrom(extra);
   if (fromExtra) return fromExtra;
-  const entries = ctx.sessionManager?.getEntries?.() ?? [];
+  const entries = ifActiveSession(() => ctx.sessionManager?.getEntries?.() ?? [], [] as unknown[]);
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
     const nested = isObject(entry) ? (entry.message ?? entry) : entry;
@@ -310,36 +310,57 @@ export function deriveDefaultChains(configuredProviders: string[]): Record<strin
   return chains;
 }
 
+async function whenSessionActive<T>(
+  ctx: ExtensionContext,
+  run: () => Promise<T> | T,
+): Promise<T | undefined> {
+  if (!ifActiveSession(() => Boolean(ctx.sessionManager), false)) return undefined;
+  try {
+    return await run();
+  } catch (error) {
+    if (isReplacedSessionError(error)) return undefined;
+    throw error;
+  }
+}
+
 export function installQuotaFallback(pi: ExtensionAPI, derivedDefaults: Record<string, ModelRef[]> = {}): void {
   pi.on("after_provider_response", async (event, ctx) => {
-    if (event.status !== 429) return;
-    const dead = ctx.model?.provider;
-    if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
+    await whenSessionActive(ctx, async () => {
+      if (event.status !== 429) return;
+      const dead = ctx.model?.provider;
+      if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
+    });
   });
 
   pi.on("message_end", async (event, ctx) => {
-    const carrier = asQuotaErrorCarrier(event.message);
-    const err = assistantErrorText(carrier);
-    if (!isQuota429(undefined, err)) return;
-    const dead = assistantProvider(carrier) ?? ctx.model?.provider;
-    if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
-    if (!carrier) return;
-    return { message: poisonRetry(event.message) };
+    return whenSessionActive(ctx, async () => {
+      const carrier = asQuotaErrorCarrier(event.message);
+      const err = assistantErrorText(carrier);
+      if (!isQuota429(undefined, err)) return;
+      const dead = assistantProvider(carrier) ?? ctx.model?.provider;
+      if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
+      if (!carrier) return;
+      return { message: poisonRetry(event.message) };
+    });
   });
 
   pi.on("agent_end", async (event, ctx) => {
-    const last = lastAssistant(ctx, event.messages);
-    if (!isQuota429(undefined, assistantErrorText(last))) return;
-    const dead = assistantProvider(last) ?? ctx.model?.provider;
-    if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
+    await whenSessionActive(ctx, async () => {
+      const last = lastAssistant(ctx, event.messages);
+      if (!isQuota429(undefined, assistantErrorText(last))) return;
+      const dead = assistantProvider(last) ?? ctx.model?.provider;
+      if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
+    });
   });
 
   pi.on("agent_settled", async (_event, ctx) => {
-    const last = lastAssistant(ctx);
-    if (isQuota429(undefined, assistantErrorText(last))) {
-      const dead = assistantProvider(last) ?? ctx.model?.provider;
-      if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
-    }
-    scheduleContinue(pi);
+    await whenSessionActive(ctx, async () => {
+      const last = lastAssistant(ctx);
+      if (isQuota429(undefined, assistantErrorText(last))) {
+        const dead = assistantProvider(last) ?? ctx.model?.provider;
+        if (dead) await switchAwayFrom(pi, ctx, dead, derivedDefaults);
+      }
+      scheduleContinue(pi);
+    });
   });
 }

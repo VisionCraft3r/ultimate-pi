@@ -6,7 +6,7 @@
  * Daily scan hits the local Cursor proxy (POST refresh, then GET) and writes
  * the same model array pi-cursor stores in cursor-model-cache.json.
  * The scan only runs when Cursor credentials AND a cursor-proxy.json file
- * both exist — otherwise it is skipped silently (no proxy running).
+ * both exist. A descriptor whose pid is not running is treated as no proxy.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
@@ -45,7 +45,7 @@ export type ModelRef = { provider: string; id: string };
 export type ScanResult =
   | { status: "skipped" }
   | { status: "unavailable" }
-  | { status: "ok"; added: string[]; total: number };
+  | { status: "ok"; added: string[]; total: number; missing: string[] };
 
 type ScanState = { lastSuccess?: string; ids?: string[] };
 type AssignmentsFile = {
@@ -93,11 +93,47 @@ export function scanDue(now = Date.now()): boolean {
   return now - at >= DAY_MS;
 }
 
+/** True when `pid` is a live process. EPERM still means the process exists. */
+export function pidIsRunning(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 function proxyPort(): number | undefined {
   const raw = readJson(inAgent("cursor-proxy.json"));
   if (!raw || typeof raw !== "object") return undefined;
-  const port = (raw as { port?: unknown }).port;
-  return typeof port === "number" && port > 0 ? port : undefined;
+  const record = raw as { port?: unknown; pid?: unknown };
+  const port = record.port;
+  if (typeof port !== "number" || port <= 0) return undefined;
+  // A descriptor left behind by a dead proxy must not be dialed.
+  if (typeof record.pid === "number" && !pidIsRunning(record.pid)) return undefined;
+  return port;
+}
+
+/** Cursor `provider/id` refs whose id is absent from the catalog. Other providers are ignored. */
+export function missingCursorRefs(catalogIds: readonly string[], refs: readonly string[]): string[] {
+  const known = new Set(catalogIds.map((id) => id.toLowerCase()));
+  const missing: string[] = [];
+  for (const ref of refs) {
+    if (!ref.toLowerCase().startsWith("cursor/")) continue;
+    const id = ref.slice("cursor/".length);
+    if (!id || !known.has(id.toLowerCase())) missing.push(ref);
+  }
+  return missing;
+}
+
+function assignedCursorRefs(): string[] {
+  const refs: string[] = [];
+  for (const agent of AGENT_NAMES) {
+    const model = readAgentModel(agent);
+    if (model) refs.push(model);
+  }
+  return refs;
 }
 
 function hasCursorCredentials(): boolean {
@@ -147,11 +183,12 @@ export async function scanCursorModels(options?: { force?: boolean }): Promise<S
   const ids = modelIds(models);
   const known = new Set(baselineIds());
   const added = ids.filter((id) => !known.has(id)).map((id) => `cursor/${id}`);
+  const missing = missingCursorRefs(ids, assignedCursorRefs());
   mkdirSync(getAgentDir(), { recursive: true });
   writeFileSync(inAgent("cursor-model-cache.json"), JSON.stringify(models));
   const state: ScanState = { lastSuccess: new Date().toISOString(), ids };
   writeFileSync(inAgent("cursor-model-scan.json"), `${JSON.stringify(state, null, 2)}\n`);
-  return { status: "ok", added, total: ids.length };
+  return { status: "ok", added, total: ids.length, missing };
 }
 
 export function formatNewModels(added: string[]): string {

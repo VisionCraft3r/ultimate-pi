@@ -4,9 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
 import { createBackupSession } from "./backup.mjs";
-import { DEPENDENCY_PATCHES, applyDependencyPatch } from "./dependency-patches.mjs";
+import { DEPENDENCY_PATCHES, applyDependencyPatch, dependencyPatchApplies } from "./dependency-patches.mjs";
 import { applyEditGuardChildGate } from "./edit-guard-child.mjs";
 import { applyScoutChildLaunch } from "./scout-child.mjs";
+import { applyStaleBoundaryPatch } from "./stale-boundary.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -255,10 +256,7 @@ export async function configurePackagesAndKeys(
   if (!options.offline && !options.dryRun) {
     const backupSession = options.backupSession ?? createBackupSession(options.agentDir);
     for (const descriptor of DEPENDENCY_PATCHES) {
-      const selected = descriptor.name === "pi-interactive-subagents"
-        ? unique.some((spec) => spec.startsWith("git:github.com/amosblomqvist/pi-interactive-subagents"))
-        : unique.includes("npm:@schultzp2020/pi-cursor");
-      if (!selected) continue;
+      if (!dependencyPatchApplies(descriptor, unique)) continue;
       const result = await applyDependencyPatch(options.agentDir, descriptor, backupSession, options);
       patchResults.push({ name: descriptor.name, status: result.status, reason: result.reason });
       if (result.status === "skipped") {
@@ -274,6 +272,17 @@ export async function configurePackagesAndKeys(
     } else {
       p.log.info(`pi-edit-guard child gate: ${editGuard.status}`);
     }
+    const staleBoundary = await applyStaleBoundaryPatch(options.agentDir);
+    const staleChanged = staleBoundary.reduce((sum, entry) => sum + entry.changed, 0);
+    const staleSeen = staleBoundary.reduce((sum, entry) => sum + entry.seen, 0);
+    const staleStatus = staleSeen === 0 ? "skipped" : staleChanged > 0 ? "applied" : "already-applied";
+    patchResults.push({
+      name: "pi-stale-boundary",
+      status: staleStatus,
+      reason: staleSeen === 0 ? "pi-coding-agent bundle not found" : undefined,
+    });
+    if (staleStatus === "skipped") p.log.warn("pi stale-session boundary skipped: pi-coding-agent bundle not found");
+    else p.log.info(`pi stale-session boundary: ${staleStatus}`);
     const scoutLaunch = await applyScoutChildLaunch(options.agentDir);
     patchResults.push({ name: "scout-child-launch", status: scoutLaunch.status, reason: scoutLaunch.reason });
     if (scoutLaunch.status === "skipped") {

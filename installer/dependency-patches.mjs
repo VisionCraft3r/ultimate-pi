@@ -56,6 +56,53 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     patch: "pi-graft-stale-ctx-0.1.2.patch",
     before: "0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4",
     after: "0f9002d52221f57fbbcd0bf6d1f5e123f94532eed49a9e051efd0bc55cd91f51",
+    supersededBy: "db3eef0b520bebaf0afe9457e7013c431676793ea00cf20fdeb5aaf9965e4d1d",
+  },
+  {
+    name: "pi-graft",
+    version: "0.1.2",
+    root: "npm/node_modules/pi-graft",
+    target: "extensions/graft.ts",
+    patch: "pi-graft-workspace-stats-0.1.2.patch",
+    before: "0f9002d52221f57fbbcd0bf6d1f5e123f94532eed49a9e051efd0bc55cd91f51",
+    after: "db3eef0b520bebaf0afe9457e7013c431676793ea00cf20fdeb5aaf9965e4d1d",
+    supersededBy: "e3f2684791d8d44fc909d84a887f58996001307be71bb3fdb10fbead5dfc6bdb",
+  },
+  {
+    name: "pi-graft",
+    version: "0.1.2",
+    root: "npm/node_modules/pi-graft",
+    target: "extensions/graft.ts",
+    patch: "pi-graft-settled-stale-0.1.2.patch",
+    before: "db3eef0b520bebaf0afe9457e7013c431676793ea00cf20fdeb5aaf9965e4d1d",
+    after: "e3f2684791d8d44fc909d84a887f58996001307be71bb3fdb10fbead5dfc6bdb",
+  },
+  {
+    name: "observational-memory",
+    version: "0.1.0",
+    root: "git/github.com/amosblomqvist/pi-observational-memory",
+    target: "src/hooks/observer-trigger.ts",
+    patch: "pi-observational-memory-observer-stale.patch",
+    before: "0bfe292de9bfd3e95a48e7499f98401d69a07b4e4f77602f9cc27945fbd87db9",
+    after: "f45758d173508b0384447d790531d401e29374e78b5472287f081eb67a24f8c0",
+  },
+  {
+    name: "observational-memory",
+    version: "0.1.0",
+    root: "git/github.com/amosblomqvist/pi-observational-memory",
+    target: "src/hooks/consolidator-trigger.ts",
+    patch: "pi-observational-memory-consolidator-stale.patch",
+    before: "4594cd243c4a5aff2e11e057dd4b0431fd76fc1e6506c0695e57a7bc1229e121",
+    after: "766634f8364569369ef7d78012363a7aa84ac679620b8f6db9436f6dee7dd061",
+  },
+  {
+    name: "observational-memory",
+    version: "0.1.0",
+    root: "git/github.com/amosblomqvist/pi-observational-memory",
+    target: "src/hooks/compaction-trigger.ts",
+    patch: "pi-observational-memory-compaction-stale.patch",
+    before: "6d3e7abc671d8ed6d0c3706d3d74f0277e541038e35d03fadc11b2210edcf2d0",
+    after: "cb757631b32a76f4a49fe6c11d2bde41bcd6d3bd172a7857bdc5c7ca0d1f2bc7",
   },
   {
     name: "pi-interactive-subagents",
@@ -76,6 +123,24 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     after: "96dfdb1d722fcb6a478ccf919aae698b5f6f2fe6b770145aeca6acb21f711136",
   },
 ]);
+
+/** True when this setup is installing the package the patch targets. */
+export function dependencyPatchApplies(descriptor, specs) {
+  const list = Array.isArray(specs) ? specs.map((spec) => String(spec)) : [];
+  if (descriptor.name === "pi-interactive-subagents") {
+    return list.some((spec) => spec.includes("pi-interactive-subagents"));
+  }
+  if (descriptor.name === "@schultzp2020/pi-cursor") {
+    return list.some((spec) => spec.includes("pi-cursor"));
+  }
+  if (descriptor.name === "pi-graft") {
+    return list.some((spec) => spec.includes("pi-graft"));
+  }
+  if (descriptor.name === "observational-memory") {
+    return list.some((spec) => spec.includes("pi-observational-memory"));
+  }
+  return false;
+}
 
 function inside(root, candidate) {
   const relative = path.relative(root, candidate);

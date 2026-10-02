@@ -3,6 +3,8 @@
  * One continuation steer; the next settle is left alone.
  */
 
+import { ifActiveSession } from "./stale-session.ts";
+
 export const VERIFY_GATE_REASON =
 	"Status is DONE but Verification has no command. Add ## Verification with the exact command in backticks and its pass or fail result, or change Status to BLOCKED.";
 
@@ -42,7 +44,7 @@ function contentText(content: unknown): string {
 }
 
 export function lastAssistantText(ctx: { sessionManager?: { getEntries?: () => unknown[] } } | undefined): string {
-	const entries = (ctx?.sessionManager?.getEntries?.() ?? []) as Entry[];
+	const entries = ifActiveSession(() => (ctx?.sessionManager?.getEntries?.() ?? []) as Entry[], [] as Entry[]);
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i];
 		const msg = entry?.message ?? entry;

@@ -12,6 +12,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { reviewPlanInBrowser } from "./plan-review.ts";
+import { ifActiveSession, isReplacedSessionError } from "./stale-session.ts";
 import { traceEvent } from "./trace.ts";
 
 const PARK_TEXT =
@@ -76,7 +77,7 @@ function toolNames(content: unknown): string[] {
 }
 
 function lastAssistant(ctx: ExtensionContext): { text: string; tools: string[] } | undefined {
-  const entries = ctx.sessionManager?.getEntries?.() ?? [];
+  const entries = ifActiveSession(() => ctx.sessionManager?.getEntries?.() ?? [], [] as unknown[]);
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i] as { type?: string; message?: { role?: string; content?: unknown } };
     const msg = entry?.message ?? entry;
@@ -202,12 +203,17 @@ export function installPlannerHandoff(pi: ExtensionAPI): void {
   }
 
   pi.on("agent_settled", (_event, ctx) => {
-    if (!isPlannerChild() || fired) return;
-    const file = sessionFile();
-    if (!file || existsSync(askPath(file))) return;
-    const last = lastAssistant(ctx);
-    if (!last || !isSilentPark(last.text, last.tools)) return;
-    fired = true;
-    writeAskSidecar(synthesizeHandoffQuestion(last.text));
+    try {
+      if (!isPlannerChild() || fired) return;
+      const file = sessionFile();
+      if (!file || existsSync(askPath(file))) return;
+      const last = lastAssistant(ctx);
+      if (!last || !isSilentPark(last.text, last.tools)) return;
+      fired = true;
+      writeAskSidecar(synthesizeHandoffQuestion(last.text));
+    } catch (error) {
+      if (isReplacedSessionError(error)) return;
+      throw error;
+    }
   });
 }

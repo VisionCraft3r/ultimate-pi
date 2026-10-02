@@ -106,11 +106,16 @@ async function runScan(ctx: ExtensionContext, force: boolean): Promise<void> {
     if (force) ctx.ui.notify("Cursor proxy unreachable — model list unchanged.", "warning");
     return;
   }
+  const missingNote = result.missing.length
+    ? ` Assigned but not in the catalog: ${result.missing.join(", ")}. Reload after the proxy registers them.`
+    : "";
   if (result.added.length === 0) {
-    if (force) ctx.ui.notify(`Cursor catalog is current (${result.total} models).`, "info");
+    if (force || result.missing.length > 0) {
+      ctx.ui.notify(`Cursor catalog is current (${result.total} models).${missingNote}`, result.missing.length ? "warning" : "info");
+    }
     return;
   }
-  ctx.ui.notify(`Cursor: ${result.added.length} new — ${formatNewModels(result.added)}`, "info");
+  ctx.ui.notify(`Cursor: ${result.added.length} new — ${formatNewModels(result.added)}${missingNote}`, "info");
 }
 
 export default function modelAgents(pi: ExtensionAPI) {
