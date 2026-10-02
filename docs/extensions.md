@@ -82,7 +82,7 @@ Set `ULTIMATE_PI_TRACE=1`, or `"ultimatePiTrace": true` in `<agentDir>/settings.
 
 ### `web-search`
 
-`web_search` calls Google Custom Search. Keys come from the environment or from `<agentDir>/extensions/web-search/auth.json`. The package ships `auth.example.json` placeholders only.
+`web_search` calls the Tavily Search API. The key comes from `TAVILY_API_KEY` or `<agentDir>/extensions/web-search/auth.json` (written by the installer prompt or `ultimate-pi setup web-search`). The package ships `auth.example.json` placeholders only.
 
 ### `prompt-snippets`
 
@@ -98,7 +98,7 @@ A two-line widget above the editor: a context bar (`ctx.getContextUsage()`, warn
 
 ### `custom-header`
 
-Replaces Pi's startup banner with the Ultimate Pi logo. `/builtin-header` restores the stock header for the session.
+Replaces Pi's startup banner with the Ultimate Pi logo. `/builtin-header` restores the stock header for the session. Every sandboxed child is launched with `-e` this file, so the pane shows the same header. It registers no tools.
 
 ## Skills
 

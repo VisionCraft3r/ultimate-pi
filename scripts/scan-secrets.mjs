@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 const PATTERNS = [
   { name: "OpenAI-style key", re: /sk-[a-zA-Z0-9]{20,}/g },
   { name: "OpenRouter key", re: /sk-or-[a-zA-Z0-9-]{10,}/g },
+  { name: "Tavily key", re: /tvly-[A-Za-z0-9_-]{16,}/g },
   { name: "AWS access key id", re: /AKIA[0-9A-Z]{16}/g },
   { name: "Private key header", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g },
   {
@@ -36,6 +37,22 @@ const ALLOWED_BARE_HEX = new Set([
   publicHex("e37f908e912ade6eebfc4048e7bc7189", "8597f89f630da9f5c2fca1dd1db45324"),
   publicHex("663479e235ac247211f64e5d6015995d", "8cff04e33726fc639eaa0b1edfe5e6bb"),
   publicHex("11502aa5ae65d8b0a8a852c5903fe029", "82e812e3f1b64d3d1eb4bf458f1ec78e"),
+  // Reproduced from npm @schultzp2020/pi-cursor@0.5.2 dist/index.js,
+  // before/after patches/pi-cursor-stale-ctx-0.5.2.patch (SHA-256).
+  publicHex("ac2b0544559910f836e627a8c292ea303", "492b7100174bf0ca3b30a7cab1fa900"),
+  publicHex("180c81c74411948dfed5b41ad441416cd", "d172f69fbae58576bc7b3638204664d"),
+  // Reproduced from npm pi-graft@0.1.2 extensions/graft.ts after the
+  // async + subagent-task patches, then the stale-ctx patch (SHA-256).
+  publicHex("0e80c4207393e90cd862514cc6e4ef3c5", "b0cf925a770f89cc2b32c7b277503a4"),
+  publicHex("0f9002d52221f57fbbcd0bf6d1f5e123f", "94532eed49a9e051efd0bc55cd91f51"),
+  // Reproduced from github.com/amosblomqvist/pi-interactive-subagents
+  // at the pinned commit above: pi-extension/subagents/index.ts, before/after
+  // pi-interactive-subagents-stale-ctx.patch. First pair: git blob ids;
+  // second pair: SHA-256. See patches/README.md for the provenance table.
+  publicHex("7e20a0fcec3a9316eaeb", "a1d6957f1893b18163f7"),
+  publicHex("2266f5a7a8e82aa9c358", "ec39a7dd53420ebf38f1"),
+  publicHex("0a438726c0a9e5bd02d0b87141b41238", "aae7c39ac2faa4f4a96eb0f5e1ecb1a4"),
+  publicHex("96dfdb1d722fcb6a478ccf919aae698b5", "f6f2fe6b770145aeca6acb21f711136"),
 ]);
 
 // Paperclip skill identifiers used as `key: "..."` in test fixtures. They look

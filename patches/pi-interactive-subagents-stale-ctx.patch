@@ -1,0 +1,84 @@
+diff --git a/pi-extension/subagents/index.ts b/pi-extension/subagents/index.ts
+index 7e20a0f..2266f5a 100644
+--- a/pi-extension/subagents/index.ts
++++ b/pi-extension/subagents/index.ts
+@@ -746,6 +746,25 @@ function renderSubagentWidgetLines(agents: RunningSubagent[], width: number): st
+   return lines;
+ }
+ 
++function deliverToParent(
++  pi: { sendMessage: (message: any, options?: any) => void } | null | undefined,
++  message: any,
++  options?: any,
++): boolean {
++  try {
++    pi?.sendMessage(message, options);
++    return true;
++  } catch (err) {
++    const text = err instanceof Error ? err.message : String(err);
++    if (text.includes("stale after session replacement or reload")) {
++      latestPi = null;
++      latestCtx = null;
++    }
++    // A replaced session cannot take a steer. The child session file still has the result.
++    return false;
++  }
++}
++
+ function updateWidget() {
+   if (!latestCtx?.hasUI) return;
+ 
+@@ -1096,7 +1115,7 @@ function startStatusRefresh(pi: ExtensionAPI) {
+ 
+     if (transitionLines.length > 0) {
+       const capped = capStatusLines(transitionLines, statusConfig.lineLimit);
+-      pi.sendMessage(
++      deliverToParent(pi,
+         {
+           customType: "subagent_status",
+           content: formatStatusAggregate(transitionLines, statusConfig.lineLimit),
+@@ -1505,7 +1524,7 @@ function deliverPendingQuestion(running: RunningSubagent): void {
+   const elapsed = Math.floor((Date.now() - running.startTime) / 1000);
+   const replyHint = `\n\nReply with subagent_message({ name: "${name}", message: "…" }) — the same name works whether it is still running or has since exited. It stays open until you reply.`;
+ 
+-  latestPi?.sendMessage(
++  deliverToParent(latestPi,
+     {
+       customType: "subagent_question",
+       content: `Sub-agent "${name}" asks (${formatElapsed(elapsed)}):\n\n${payload.question}${replyHint}`,
+@@ -1830,7 +1849,7 @@ export default function subagentsExtension(pi: ExtensionAPI) {
+ 
+             const presentation = resolveResultPresentation(result, running.name);
+ 
+-            pi.sendMessage(
++            deliverToParent(pi,
+               {
+                 customType: "subagent_result",
+                 content: presentation,
+@@ -1853,7 +1872,7 @@ export default function subagentsExtension(pi: ExtensionAPI) {
+           })
+           .catch((err) => {
+             updateWidget();
+-            pi.sendMessage(
++            deliverToParent(pi,
+               {
+                 customType: "subagent_result",
+                 content: `Sub-agent "${running.name}" error: ${err?.message ?? String(err)}`,
+@@ -2274,7 +2293,7 @@ export default function subagentsExtension(pi: ExtensionAPI) {
+               name,
+             );
+ 
+-            pi.sendMessage(
++            deliverToParent(pi,
+               {
+                 customType: "subagent_result",
+                 content: presentation,
+@@ -2294,7 +2313,7 @@ export default function subagentsExtension(pi: ExtensionAPI) {
+           })
+           .catch((err) => {
+             updateWidget();
+-            pi.sendMessage(
++            deliverToParent(pi,
+               {
+                 customType: "subagent_result",
+                 content: `Resume error: ${err?.message ?? String(err)}`,

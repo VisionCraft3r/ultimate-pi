@@ -1,4 +1,3 @@
 {
-  "google_search_api_key": "your-google-api-key-here",
-  "google_cse_id": "your-google-cse-id-here"
+  "tavily_api_key": "your-tavily-api-key-here"
 }

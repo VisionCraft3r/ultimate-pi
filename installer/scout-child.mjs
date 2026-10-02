@@ -33,6 +33,11 @@ const QA_BLOCK = `    if (loadout.agent === "qa_tester") {
       }
     }`;
 
+const HEADER_BLOCK = `    if (loadout.agentDir) {
+      const header = join(loadout.agentDir, "extensions", "custom-header.ts");
+      if (existsSync(header)) parts.push("-e", shellEscape(header));
+    }`;
+
 const LOOP_REPLACEMENT = `    for (const extPath of extPaths) {
       parts.push("-e", shellEscape(extPath));
     }
@@ -169,6 +174,77 @@ export function ensureScoutToolDiet(source) {
   };
 }
 
+/**
+ * Every sandboxed child loads the Ultimate Pi header. Tool allowlists stay
+ * as they are; this file registers no tools.
+ * @param {string} source
+ */
+export function ensureChildHeader(source) {
+  if (source.includes('extensions", "custom-header.ts"')) {
+    return { status: "already-applied", source };
+  }
+  if (!source.includes(QA_BLOCK)) {
+    return { status: "skipped", reason: "qa branch not in the expected shape", source };
+  }
+  if (source.split(QA_BLOCK).length !== 2) {
+    return { status: "skipped", reason: "qa branch is not unique", source };
+  }
+  return { status: "applied", source: source.replace(QA_BLOCK, `${QA_BLOCK}\n${HEADER_BLOCK}`) };
+}
+
+const STDOUT_AND_STDERR_REDIRECT =
+  "`${child} >> ${shellEscape(logPath)} 2>&1; echo '__SUBAGENT_DONE_'$?'__'`";
+const STDERR_ONLY_REDIRECT =
+  "`${child} 2>> ${shellEscape(logPath)}; echo '__SUBAGENT_DONE_'$?'__'`";
+
+/**
+ * Keep the child's screen on the tmux pane. A launcher that still sends
+ * stdout and stderr to the log is switched to stderr only. No redirect, or
+ * an existing stderr-only redirect, is left alone.
+ * @param {string} source
+ */
+export function ensureStderrOnlyChildLog(source) {
+  if (source.includes(STDERR_ONLY_REDIRECT)) {
+    return { status: "already-applied", source };
+  }
+  if (!source.includes(STDOUT_AND_STDERR_REDIRECT)) {
+    return { status: "already-applied", source };
+  }
+  if (source.split(STDOUT_AND_STDERR_REDIRECT).length !== 2) {
+    return { status: "skipped", reason: "child log redirect is not unique", source };
+  }
+  return { status: "applied", source: source.replace(STDOUT_AND_STDERR_REDIRECT, STDERR_ONLY_REDIRECT) };
+}
+
+const SHUTDOWN_SCOPE_IMPORT = `import { partitionByParentSession } from "./shutdown-scope.ts";`;
+const VIEWER_IMPORT = `import {
+  renderAgentDocument,
+  startViewer,
+  type ViewerAgent,
+  type ViewerHandle,
+} from "./viewer.ts";`;
+
+/**
+ * A launcher that calls startViewer must import it. The published package
+ * never calls it, and a file that already imports ./viewer.ts is left alone.
+ * @param {string} source
+ */
+export function ensureViewerImport(source) {
+  if (source.includes('from "./viewer.ts"')) {
+    return { status: "already-applied", source };
+  }
+  if (!source.includes("startViewer(")) {
+    return { status: "already-applied", source };
+  }
+  if (!source.includes(SHUTDOWN_SCOPE_IMPORT) || source.split(SHUTDOWN_SCOPE_IMPORT).length !== 2) {
+    return { status: "skipped", reason: "shutdown-scope import not found", source };
+  }
+  return {
+    status: "applied",
+    source: source.replace(SHUTDOWN_SCOPE_IMPORT, `${SHUTDOWN_SCOPE_IMPORT}\n${VIEWER_IMPORT}`),
+  };
+}
+
 /** Apply the scout launch flags to the installed subagent launcher. */
 export async function applyScoutChildLaunch(agentDir) {
   if (!agentDir) return { status: "skipped", reason: "no agent directory" };
@@ -183,7 +259,14 @@ export async function applyScoutChildLaunch(agentDir) {
   let sourceNext = source;
   let status = "already-applied";
   const reasons = [];
-  for (const ensure of [ensureScoutChildLaunch, ensureSeparateThinkingFlag, ensureScoutToolDiet]) {
+  for (const ensure of [
+    ensureScoutChildLaunch,
+    ensureSeparateThinkingFlag,
+    ensureScoutToolDiet,
+    ensureChildHeader,
+    ensureStderrOnlyChildLog,
+    ensureViewerImport,
+  ]) {
     const result = ensure(sourceNext);
     if (result.status === "applied") {
       sourceNext = result.source;

@@ -91,7 +91,7 @@ User-Agent is the generic `Mozilla/5.0 (compatible; ultimate-pi/1.0.0-alpha)` (n
 
 ### `extensions/web-search/`
 
-Local/custom. Google Custom Search wrapper with env aliases `GOOGLE_SEARCH_API_KEY` | `GOOGLE_API_KEY` and `GOOGLE_CSE_ID` | `GOOGLE_CUSTOM_SEARCH_ENGINE_ID`. Ships `auth.example.json` **placeholders only**. Do not copy a real `auth.json`. File-based credentials, if used, live under the agent dir (`<agentDir>/extensions/web-search/auth.json`).
+Local/custom. Tavily Search API wrapper (`POST https://api.tavily.com/search`, bearer auth) reading `TAVILY_API_KEY`. Ships `auth.example.json` **placeholders only**. Do not copy a real `auth.json`. File-based credentials, if used, live under the agent dir (`<agentDir>/extensions/web-search/auth.json`).
 
 ### `extensions/ask-user-question.ts`
 

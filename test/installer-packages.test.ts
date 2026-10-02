@@ -1,12 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { BMAD_PACKAGE, configurePackagesAndKeys, assertGitAvailableForSpecs, gitMissingMessage } from "../installer/packages.mjs";
 import { ensureEditGuardChildGate } from "../installer/edit-guard-child.mjs";
-import { ensureScoutChildLaunch, ensureScoutToolDiet, ensureSeparateThinkingFlag } from "../installer/scout-child.mjs";
+import {
+  applyScoutChildLaunch,
+  ensureChildHeader,
+  ensureScoutChildLaunch,
+  ensureScoutToolDiet,
+  ensureSeparateThinkingFlag,
+  ensureStderrOnlyChildLog,
+  ensureViewerImport,
+} from "../installer/scout-child.mjs";
 import { doctor } from "../installer/doctor.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -366,6 +374,11 @@ test("scout child launch adds the budget inside the sandbox loop and not the len
   assert.match(applied.source, /loadout\.agent === "qa_tester"/);
   assert.match(applied.source, /qa-budget\.ts/);
   assert.equal(ensureScoutChildLaunch(applied.source).status, "already-applied");
+
+  const headed = ensureChildHeader(applied.source);
+  assert.equal(headed.status, "applied");
+  assert.match(headed.source, /custom-header\.ts/);
+  assert.equal(ensureChildHeader(headed.source).status, "already-applied");
 });
 
 test("a launcher that already has the scout branch gains the QA cap", () => {
@@ -427,4 +440,51 @@ test("scout child context keeps two graft tools and drops pi-lens", () => {
   assert.match(applied.source, /graft_find_code", "graft_repo_map"/);
   assert.match(applied.source, /contextExtensionsForChild\(granted, loadout\.agent\)/);
   assert.equal(ensureScoutToolDiet(applied.source).status, "already-applied");
+});
+
+const OLD_CHILD_LOG =
+  "return `${child} >> ${shellEscape(logPath)} 2>&1; echo '__SUBAGENT_DONE_'$?'__'`;\n";
+const FIXED_CHILD_LOG =
+  "return `${child} 2>> ${shellEscape(logPath)}; echo '__SUBAGENT_DONE_'$?'__'`;\n";
+const VIEWER_CALL = `import { partitionByParentSession } from "./shutdown-scope.ts";
+viewerPromise = startViewer(viewerAgents)
+`;
+
+test("child log redirect keeps stdout on the pane and the viewer import stays attached", () => {
+  assert.equal(ensureStderrOnlyChildLog("export function launch() { return true; }\n").status, "already-applied");
+  const redirected = ensureStderrOnlyChildLog(OLD_CHILD_LOG);
+  assert.equal(redirected.status, "applied");
+  assert.match(redirected.source, /2>> \$\{shellEscape\(logPath\)\}/);
+  assert.doesNotMatch(redirected.source, /2>&1/);
+  assert.equal(ensureStderrOnlyChildLog(redirected.source).status, "already-applied");
+  assert.equal(ensureStderrOnlyChildLog(FIXED_CHILD_LOG).status, "already-applied");
+
+  assert.equal(ensureViewerImport("export function launch() { return true; }\n").status, "already-applied");
+  const imported = ensureViewerImport(VIEWER_CALL);
+  assert.equal(imported.status, "applied");
+  assert.match(imported.source, /from "\.\/viewer\.ts"/);
+  assert.match(imported.source, /startViewer,/);
+  assert.match(imported.source, /renderAgentDocument,/);
+  assert.equal(ensureViewerImport(imported.source).status, "already-applied");
+});
+
+test("child launcher repairs a temporary installation and is idempotent", async () => {
+  const agentDir = await mkdtemp(path.join(tmpdir(), "upi-child-launcher-"));
+  const launcher = path.join(agentDir, "git", "github.com", "amosblomqvist",
+    "pi-interactive-subagents", "pi-extension", "subagents", "index.ts");
+  try {
+    await mkdir(path.dirname(launcher), { recursive: true });
+    await writeFile(launcher, VIEWER_CALL + OLD_CHILD_LOG + THINKING_FIXTURE + DIET_FIXTURE + SANDBOX_FIXTURE);
+    const repaired = await applyScoutChildLaunch(agentDir);
+    assert.equal(repaired.status, "applied");
+    assert.equal(repaired.reason, undefined);
+    const source = await readFile(launcher, "utf8");
+    assert.equal(ensureStderrOnlyChildLog(source).status, "already-applied");
+    assert.equal(ensureViewerImport(source).status, "already-applied");
+    assert.equal(ensureChildHeader(source).status, "already-applied");
+    assert.equal((await applyScoutChildLaunch(agentDir)).status, "already-applied");
+    assert.equal(await readFile(launcher, "utf8"), source);
+  } finally {
+    await rm(agentDir, { recursive: true, force: true });
+  }
 });

@@ -76,8 +76,29 @@ export function isQuota429(status?: number, text?: string): boolean {
     /\b429\b/.test(t) ||
     /rate_limit_error/i.test(t) ||
     /exceed your account's rate limit/i.test(t) ||
-    /retry failed after \d+ attempts/i.test(t)
+    /retry failed after \d+ attempts/i.test(t) ||
+    /resource_exhausted/i.test(t) ||
+    /extra usage, not your plan limits/i.test(t)
   );
+}
+
+/** Cursor's connect layer puts resource_exhausted in assistant text with stopReason stop and no errorMessage. */
+export function quotaSignalFromMessage(message: unknown): string {
+  if (!isObject(message)) return "";
+  const err = typeof message.errorMessage === "string" ? message.errorMessage : "";
+  if (err) return err;
+  const content = message.content;
+  let text = "";
+  if (typeof content === "string") text = content;
+  else if (Array.isArray(content)) {
+    text = content
+      .filter((part) => isObject(part) && part.type === "text" && typeof part.text === "string")
+      .map((part) => (part as { text: string }).text)
+      .join("\n");
+  }
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 500) return "";
+  return isQuota429(undefined, trimmed) ? trimmed : "";
 }
 
 function notify(ctx: ExtensionContext, message: string, type: "info" | "warning" | "error"): void {
@@ -93,11 +114,16 @@ function notify(ctx: ExtensionContext, message: string, type: "info" | "warning"
   }
 }
 
+const QUOTA_HOLD_KEY = Symbol.for("ultimate-pi/quota-fallback-hold");
+
+function setQuotaHold(on: boolean): void {
+  (globalThis as Record<symbol, unknown>)[QUOTA_HOLD_KEY] = on;
+}
+
 function assistantErrorText(message: QuotaErrorCarrier | undefined): string {
   if (!message) return "";
-  const err = typeof message.errorMessage === "string" ? message.errorMessage : "";
   if (message.role && message.role !== "assistant") return "";
-  return err;
+  return quotaSignalFromMessage(message);
 }
 
 function assistantProvider(message: QuotaErrorCarrier | undefined): string | undefined {
@@ -183,6 +209,7 @@ async function switchAwayFrom(
   const current = ctx.model;
   if (current && current.provider !== deadProvider) {
     pendingContinue = true;
+    setQuotaHold(true);
     return true;
   }
 
@@ -216,6 +243,7 @@ async function switchAwayFrom(
         notify(ctx, `429: ${from} quota gone — switched to ${to}`, "warning");
         traceEvent("quota-fallback", { from, to });
         pendingContinue = true;
+        setQuotaHold(true);
         return true;
       }
       failures.push(`${spec.provider}/${spec.id} (setModel false — no auth)`);
@@ -243,6 +271,7 @@ function poisonRetry<T extends QuotaErrorCarrier>(message: T): T {
 function scheduleContinue(pi: ExtensionAPI): void {
   if (!pendingContinue) return;
   pendingContinue = false;
+  setQuotaHold(false);
   setTimeout(() => {
     try {
       pi.sendUserMessage(
@@ -251,6 +280,7 @@ function scheduleContinue(pi: ExtensionAPI): void {
       );
     } catch (err) {
       pendingContinue = true;
+      setQuotaHold(true);
       try {
         // last-resort: leave the flag so a later settled event can retry
         console.error("[quota-fallback] continue failed:", err);

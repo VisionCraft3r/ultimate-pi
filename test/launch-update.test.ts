@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyNpmUpdate, copySource, gitCheckoutDir, isSubagentSession, mapWithCap, nonNpmPackageNote, npmCheckDue, npmPackageName, parsePiVersion, plannotatorUpdateAllowed, versionAtLeast } from "../lib/launch-update.ts";
+import { classifyNpmUpdate, copySource, copySourceIfIdle, gitCheckoutDir, isSubagentSession, mapWithCap, nonNpmPackageNote, npmCheckDue, npmPackageName, parsePiVersion, plannotatorExtensionIndex, plannotatorUpdateAllowed, reapplyPlannotatorCreateGuard, SUBAGENT_SYNC_DEFER, versionAtLeast } from "../lib/launch-update.ts";
 import { copyExtensionTree, isExtensionFactorySource, unsafeExtensionEntries } from "../lib/extension-layout.ts";
 import { formatAnswers, formatSidecarQuestion, paperclipEnv, parseSubagentQuestion, questionsFromAsk } from "../lib/paperclip-questions.ts";
 import { writeAskSidecar } from "../lib/planner-handoff.ts";
@@ -45,6 +45,52 @@ test("subagent sessions skip launch update and npm checks wait six hours", () =>
   assert.equal(npmCheckDue("not-a-date", now), true);
   assert.equal(npmCheckDue("2026-09-30T11:00:00Z", now), false);
   assert.equal(npmCheckDue("2026-09-30T05:00:00Z", now), true);
+});
+
+test("Plannotator fresh-session guard is restored after a package update", () => {
+  const root = mkdtempSync(join(tmpdir(), "upi-plannotator-"));
+  const indexPath = plannotatorExtensionIndex(root);
+  mkdirSync(join(root, "npm", "node_modules", "@plannotator", "pi-extension"), { recursive: true });
+  const unguarded = [
+    "\t\tupdateStatus(ctx);",
+    "\t\tupdateWidget(ctx);",
+    "\t\tpersistState();",
+    "\t}",
+    "",
+    '\tpi.on("session_start", async (_event, ctx) => {',
+    "",
+  ].join("\n");
+  writeFileSync(indexPath, `before\n${unguarded}after\n`);
+  assert.equal(reapplyPlannotatorCreateGuard(indexPath), "patched");
+  assert.equal(reapplyPlannotatorCreateGuard(indexPath), "already");
+  assert.match(readFileSync(indexPath, "utf8"), /stateEntry\?\.data \|\| phase !== "idle"/);
+  assert.equal(reapplyPlannotatorCreateGuard(join(root, "missing.ts")), "missing");
+  writeFileSync(indexPath, "no marker\n");
+  assert.equal(reapplyPlannotatorCreateGuard(indexPath), "unmatched");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("sync copy waits while subagents are running", () => {
+  const key = Symbol.for("pi-subagents/running-children-count");
+  const root = mkdtempSync(join(tmpdir(), "upi-sync-idle-"));
+  const source = join(root, "src");
+  const dest = join(root, "dest");
+  mkdirSync(join(source, "lib"), { recursive: true });
+  writeFileSync(join(source, "lib", "marker.txt"), "new\n");
+  mkdirSync(dest, { recursive: true });
+  (globalThis as Record<symbol, unknown>)[key] = () => 2;
+  try {
+    const held = copySourceIfIdle(source, dest);
+    assert.equal("deferred" in held ? held.deferred : "", SUBAGENT_SYNC_DEFER);
+    assert.equal(exists(join(dest, "lib", "marker.txt")), false);
+    (globalThis as Record<symbol, unknown>)[key] = () => 0;
+    const copied = copySourceIfIdle(source, dest);
+    assert.equal("skipped" in copied, true);
+    assert.equal(exists(join(dest, "lib", "marker.txt")), true);
+  } finally {
+    delete (globalThis as Record<symbol, unknown>)[key];
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("versioned npm specs resolve to the installed package name", () => {

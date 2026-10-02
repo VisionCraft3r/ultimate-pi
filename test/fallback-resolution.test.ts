@@ -9,7 +9,7 @@ const scratch = mkdtempSync(join(tmpdir(), "upi-fallback-"));
 process.env.PI_CODING_AGENT_DIR = scratch;
 
 const { resolveFallbackChain, resolveScopedSwitchChain } = await import("../lib/model-agents.ts");
-const { deriveDefaultChains } = await import("../lib/quota-fallback.ts");
+const { deriveDefaultChains, isQuota429, quotaSignalFromMessage } = await import("../lib/quota-fallback.ts");
 
 const ASSIGNMENTS = join(scratch, "model-agents.json");
 
@@ -85,6 +85,30 @@ test("scoped switch ignores derived defaults and models outside the scope", () =
 	writeAssignments({});
 	assert.deepEqual(resolveScopedSwitchChain("anthropic", DEFAULTS, "worker", []), DEFAULT_CHAIN);
 	assert.deepEqual(resolveScopedSwitchChain("anthropic", DEFAULTS, "worker", scoped), []);
+});
+
+test("resource_exhausted in a short assistant text is a quota signal", () => {
+	const text = "[Error: Connect error resource_exhausted: Error (retries exhausted)]";
+	assert.equal(isQuota429(undefined, text), true);
+	assert.equal(
+		isQuota429(undefined, '400 {"type":"error","error":{"message":"Third-party apps now draw from your extra usage, not your plan limits."}}'),
+		true,
+	);
+	assert.equal(
+		quotaSignalFromMessage({
+			role: "assistant",
+			stopReason: "stop",
+			content: [{ type: "text", text: `\n${text}` }],
+		}),
+		text,
+	);
+	assert.equal(
+		quotaSignalFromMessage({
+			role: "assistant",
+			content: [{ type: "text", text: `The handler mentions resource_exhausted in a long explanation. ${"x".repeat(500)}` }],
+		}),
+		"",
+	);
 });
 
 test("deriveDefaultChains produces a chain that excludes the provider itself", () => {

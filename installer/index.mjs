@@ -7,6 +7,7 @@ import { collectProviders, yesModeAuthError } from "./providers.mjs";
 import { assignAgentModels } from "./agents.mjs";
 import { configureFallbacks } from "./fallbacks.mjs";
 import { configurePackagesAndKeys } from "./packages.mjs";
+import { configureWebSearchKey } from "./web-search-key.mjs";
 import { mergeCredentials, readAuth } from "./auth-store.mjs";
 import { mergeModelsJson } from "./models-json.mjs";
 import { applySettings } from "./settings.mjs";
@@ -80,6 +81,7 @@ export async function install(rawOptions) {
   const agentAssignments = await assignAgentModels(options, providers);
   const { providerChains, agentFallbacks } = await configureFallbacks(options, providers, agentAssignments);
   const { keys, jev, memory, packages } = await configurePackagesAndKeys(options, providers, agentAssignments);
+  const webSearch = await configureWebSearchKey(options);
   const { enabledExtras } = await configureExtras(options);
 
   const allProviders = [...providers, ...keys];
@@ -107,6 +109,7 @@ export async function install(rawOptions) {
   log(options, "");
   log(options, `JEV: ${jev?.mode === "openrouter" ? "configured (OpenRouter)" : "heuristic fallback mode"}`);
   log(options, `Observational memory: ${memory?.enabled ? "configured (DeepSeek)" : "not installed"}`);
+  log(options, `Web search (Tavily): ${webSearch.configured ? "configured" : "not configured"}`);
   log(options, `macOS extras enabled: ${enabledExtras.length ? enabledExtras.join(", ") : "(none)"}`);
 
   if (!options.dryRun) {
@@ -117,11 +120,11 @@ export async function install(rawOptions) {
     }
   }
 
-  log(options, "\nInstall complete. Re-run any step with: ultimate-pi setup <providers|agents|fallbacks|jev|memory|extras>");
+  log(options, "\nInstall complete. Re-run any step with: ultimate-pi setup <providers|agents|fallbacks|jev|memory|web-search|extras>");
   return 0;
 }
 
-const SETUP_TOPICS = new Set(["providers", "agents", "fallbacks", "jev", "memory", "extras"]);
+const SETUP_TOPICS = new Set(["providers", "agents", "fallbacks", "jev", "memory", "web-search", "extras"]);
 
 export async function setup(rawOptions) {
   const options = await resolveOptions(rawOptions);
@@ -187,6 +190,11 @@ export async function setup(rawOptions) {
       log(options, `JEV: ${jev?.mode === "openrouter" ? "configured" : "heuristic fallback mode"}`);
       log(options, `Observational memory: ${memory?.enabled ? "configured" : "not installed"}`);
       void packages;
+      break;
+    }
+    case "web-search": {
+      const r = await configureWebSearchKey(options, { force: true });
+      log(options, `Web search (Tavily): ${r.configured ? "configured" : "not configured"}`);
       break;
     }
     case "extras": {

@@ -107,6 +107,27 @@ Always select the agent with the `agent` field: `subagent({ agent: "scout", name
 - Delegate before you read. If you are about to grep and read 5+ files to orient, that is a `scout` dispatch. If you are about to fetch 3+ web pages, that is a `researcher` dispatch.
 - Scout to find, read to edit. Subagents return summaries, not verbatim source — re-read the 1–3 files you actually modify.
 
+## SESSION-AUDIT HARDENING RULES
+
+These come from a log audit of ~1,245 sessions and target the highest-volume recoverable tool
+errors. They apply in the main session and in any child that has the relevant tool.
+
+- **Edit discipline**: never hand-retype `oldText`. Pull it verbatim from a prior `read` /
+  `read_symbol` / `read_enclosing` result. If `edit` reports the text is not unique, widen the
+  snippet with just enough surrounding context to disambiguate — do not retry the same short
+  snippet. This was the single most expensive recoverable error class in the audit.
+- **Stop single-file ENOENT probing**: before reading a config/extension file whose existence
+  you are not sure of, `ls` the containing directory (or glob) once and read only what's there.
+  Do not read speculative paths one at a time.
+- **web_search**: if it reports missing credentials once in a session, do not retry it again in
+  that same session — tell the user once and continue without it.
+- **graft scoping**: before a scoped `graft_find_all`/`graft_find_code` with an `in:`/path
+  prefix, confirm that prefix exists via `graft_repo_map` first; a guessed prefix returns
+  "nothing indexed under X" and wastes a round.
+- **Secret/personal-data scanning**: on any task that prepares code for a public repo or external
+  sharing, run the secret/personal-data scan after every meaningful change (not just once before
+  push) so a leak is caught at the commit that introduced it, not several commits later.
+
 ## Cache discipline
 
 Maximize prompt-cache hits: keep the stable prefix (system prompt, context files) untouched mid-session, append rather than rewrite, and avoid re-reading files already in context. Monitor effectiveness with `/cache graph` and `/cache stats` (pi-cache-graph) and compact when the cumulative hit rate degrades. When compacting, preserve modified files, the exact test commands and their results, the current milestone, and open blockers.
@@ -127,5 +148,5 @@ Extensions that register no tools — `graft-context`, `pi-cache-graph`, `observ
 
 See the README for what each agent does, how fallback resolution is ordered
 (per-agent override → per-provider chain → derived default → none), and how
-to re-run any of this with `ultimate-pi setup <providers|agents|fallbacks|jev|memory|extras>`.
+to re-run any of this with `ultimate-pi setup <providers|agents|fallbacks|jev|memory|web-search|extras>`.
 <!-- ultimate-pi:end -->

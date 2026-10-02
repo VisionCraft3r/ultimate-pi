@@ -102,7 +102,7 @@ rollback:
   `npx playwright-core install chromium`. See
   [extensions/browser/README.md](./extensions/browser/README.md) for details.
 - Optional: an OpenRouter API key (for JEV routing), a DeepSeek API key (for
-  observational memory), a Google Custom Search key/CSE id (for `web_search`),
+  observational memory), a Tavily API key (for `web_search`),
   and `python3` / `yt-dlp` (for the bundled skills).
 
 ## Quick start
@@ -279,7 +279,7 @@ the parent sees the spec. See
 
 ```
 ultimate-pi [install] [flags]
-ultimate-pi setup <providers|agents|fallbacks|jev|memory|extras> [flags]
+ultimate-pi setup <providers|agents|fallbacks|jev|memory|web-search|extras> [flags]
 ultimate-pi doctor [flags]
 ultimate-pi uninstall [flags]
 

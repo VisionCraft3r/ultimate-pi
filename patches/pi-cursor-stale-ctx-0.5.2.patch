@@ -1,0 +1,42 @@
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1518,21 +1518,27 @@
+ 		}
+ 	});
+ 	pi.on("session_start", (_event, ctx) => {
+-		const realId = ctx.sessionManager.getSessionId();
+-		if (realId && realId !== sessionId) {
+-			sessionId = realId;
+-			register();
+-		}
+-		logLifecycle(sessionId, "", { event: "session_start" });
++		try {
++			const realId = ctx.sessionManager.getSessionId();
++			if (realId && realId !== sessionId) {
++				sessionId = realId;
++				register();
++			}
++			logLifecycle(sessionId, "", { event: "session_start" });
++		} catch { /* stale context after a model switch */ }
+ 	});
+ 	pi.on("before_provider_request", (event, ctx) => {
+-		if (ctx.model?.provider !== "cursor") return event.payload;
+-		const { payload } = event;
+-		if (typeof payload === "object" && payload !== null) {
+-			payload.pi_session_id = sessionId;
+-			payload.pi_cwd = ctx.cwd;
++		try {
++			if (ctx.model?.provider !== "cursor") return event.payload;
++			const { payload } = event;
++			if (typeof payload === "object" && payload !== null) {
++				payload.pi_session_id = sessionId;
++				payload.pi_cwd = ctx.cwd;
++			}
++			return payload;
++		} catch {
++			return event.payload;
+ 		}
+-		return payload;
+ 	});
+ 	async function cleanupCurrentSession() {
+ 		if (!currentPort) return;

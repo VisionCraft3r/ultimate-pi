@@ -14,6 +14,7 @@ function defaultAnswers() {
     packages: [],
     openrouterKey: undefined,
     deepseekKey: undefined,
+    tavilyKey: undefined,
     extras: { enabledExtras: [] },
   };
 }
@@ -132,6 +133,7 @@ export async function writeAnswersTemplate(filePath) {
     packages: [],
     openrouterKey: undefined,
     deepseekKey: undefined,
+    tavilyKey: undefined,
     extras: { enabledExtras: [] },
   };
   await fs.writeFile(filePath, `${JSON.stringify(template, null, 2)}\n`, "utf8");

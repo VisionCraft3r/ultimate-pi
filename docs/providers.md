@@ -164,25 +164,22 @@ Any OpenAI-compatible provider: a provider id Pi already understands plus an API
 2. Merges it into `auth.json` under the `other` id as `{ "type": "api_key", "key": "…" }`.
 3. Does not prompt for a custom base URL; configure that in Pi's own provider settings if the endpoint is not the default.
 
-## Google Custom Search (`web_search`)
+## Tavily (`web_search`)
 
-Not a model provider. The bundled `web_search` tool calls [Google Programmable Search / Custom Search JSON API](https://developers.google.com/custom-search/v1/introduction). The installer does **not** collect these credentials; set them yourself.
+Not a model provider. The bundled `web_search` tool calls the [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search).
 
 **Prepare**
 
-1. A Google Cloud API key with Custom Search API enabled.
-2. A Programmable Search Engine id.
+- A Tavily API key (`tvly-…`) from https://app.tavily.com.
 
-**Env vars** (either name in each pair works):
+Key sources, in priority order:
 
-| Role | Names |
-|---|---|
-| API key | `GOOGLE_SEARCH_API_KEY` or `GOOGLE_API_KEY` |
-| Engine id | `GOOGLE_CSE_ID` or `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` |
+1. `TAVILY_API_KEY` in the environment.
+2. `<agentDir>/extensions/web-search/auth.json` with `tavily_api_key`. Copy `auth.example.json` and replace the placeholder locally; the package ships placeholders only. Never commit a real `auth.json`.
 
-Alternatively, copy `<agentDir>/extensions/web-search/auth.example.json` to `<agentDir>/extensions/web-search/auth.json` and fill the placeholders. That file is placeholders only — never commit a real `auth.json`.
+The installer offers an optional masked key prompt. `ultimate-pi setup web-search` writes the same extension-local file with mode `0600`.
 
-Without these, `web_search` errors with a missing-credentials message; `web_fetch` does not need them.
+Without this key, `web_search` errors with a missing-credentials message; `web_fetch` does not need it.
 
 ## Related
 

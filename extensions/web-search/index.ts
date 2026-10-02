@@ -4,7 +4,7 @@ import { loadCredentials, resolveAuthPath } from "./credentials.ts";
 
 export { loadCredentials, resolveAuthPath };
 
-const CSE_ENDPOINT = "https://www.googleapis.com/customsearch/v1";
+const TAVILY_ENDPOINT = "https://api.tavily.com/search";
 const SEARCH_TIMEOUT_MS = 15_000;
 
 type SearchArgs = {
@@ -34,26 +34,47 @@ function composeQuery(args: SearchArgs): string {
 	if (query) chunks.push(query);
 	for (const phrase of terms(args.exactPhrases)) chunks.push(`"${phrase.replaceAll('"', "")}"`);
 	for (const term of terms(args.excludeTerms)) chunks.push(term.startsWith("-") ? term : `-${term}`);
-	const site = args.site?.trim().replace(/^site:/i, "");
-	if (site) chunks.push(`site:${site}`);
 	return chunks.join(" ").trim();
+}
+
+export function buildTavilyRequest(args: SearchArgs, apiKey: string): { url: string; init: RequestInit } | undefined {
+	const query = composeQuery(args);
+	if (!query) return undefined;
+	const site = args.site?.trim().replace(/^site:/i, "");
+	const body = {
+		query,
+		max_results: clampCount(args.count),
+		search_depth: "basic",
+		topic: "general",
+		include_answer: false,
+		...(site ? { include_domains: [site] } : {}),
+		...(terms(args.exactPhrases).length > 0 ? { exact_match: true } : {}),
+	};
+	return {
+		url: TAVILY_ENDPOINT,
+		init: {
+			method: "POST",
+			headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+			body: JSON.stringify(body),
+		},
+	};
 }
 
 function toolResult(text: string) {
 	return { content: [{ type: "text" as const, text }], details: {} };
 }
 
-function parseHits(payload: unknown): SearchHit[] {
-	if (!payload || typeof payload !== "object" || !("items" in payload)) return [];
-	const items = (payload as { items?: unknown }).items;
+export function parseHits(payload: unknown): SearchHit[] {
+	if (!payload || typeof payload !== "object" || !("results" in payload)) return [];
+	const items = (payload as { results?: unknown }).results;
 	if (!Array.isArray(items)) return [];
 	const hits: SearchHit[] = [];
 	for (const item of items) {
 		if (!item || typeof item !== "object") continue;
 		const rec = item as Record<string, unknown>;
 		const title = typeof rec.title === "string" ? rec.title : "";
-		const url = typeof rec.link === "string" ? rec.link : "";
-		const snippet = typeof rec.snippet === "string" ? rec.snippet : "";
+		const url = typeof rec.url === "string" ? rec.url : "";
+		const snippet = typeof rec.content === "string" ? rec.content : "";
 		if (title || url) hits.push({ title, url, snippet });
 	}
 	return hits;
@@ -71,7 +92,7 @@ export default function webSearch(pi: ExtensionAPI) {
 		name: "web_search",
 		label: "Web Search",
 		description:
-			"Search the web via Google Custom Search. Optional exact phrases, excluded terms, site filter, and result count (1-10).",
+			"Search the web via Tavily. Optional exact phrases, excluded terms, site filter, and result count (1-10).",
 		parameters: Type.Object({
 			query: Type.Optional(Type.String()),
 			exactPhrases: Type.Optional(Type.Array(Type.String())),
@@ -86,23 +107,26 @@ export default function webSearch(pi: ExtensionAPI) {
 			const creds = loadCredentials();
 			if (!creds) {
 				return toolResult(
-					"Missing Google Custom Search credentials. Set GOOGLE_SEARCH_API_KEY and GOOGLE_CSE_ID (or GOOGLE_API_KEY and GOOGLE_CUSTOM_SEARCH_ENGINE_ID), or create auth.json from auth.example.json under the agent dir.",
+					"Missing Tavily credentials. Set TAVILY_API_KEY, run `ultimate-pi setup web-search`, or create auth.json from auth.example.json under <agentDir>/extensions/web-search/.",
 				);
 			}
 			let response: Response;
 			try {
-				const url = new URL(CSE_ENDPOINT);
-				url.searchParams.set("q", q);
-				url.searchParams.set("key", creds.apiKey);
-				url.searchParams.set("cx", creds.cseId);
-				url.searchParams.set("num", String(clampCount(params.count)));
-				response = await fetch(url, { signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS) });
+				const request = buildTavilyRequest(params, creds.apiKey);
+				if (!request) return toolResult("Provide a non-empty query or exactPhrases.");
+				response = await fetch(TAVILY_ENDPOINT, { ...request.init, signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS) });
 			} catch (error) {
 				const timedOut =
 					error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 				return toolResult(timedOut ? "Web search timed out." : "Web search request failed.");
 			}
-			if (!response.ok) return toolResult(`Web search failed (${response.status}).`);
+			if (!response.ok) {
+				const status = response.status;
+				if (status === 401) return toolResult("Web search failed (401): Tavily rejected the API key.");
+				if (status === 429) return toolResult("Web search failed (429): Tavily rate limit — retry later.");
+				if (status === 432 || status === 433) return toolResult(`Web search failed (${status}): Tavily usage limit reached for this key/plan.`);
+				return toolResult(`Web search failed (${status}).`);
+			}
 			try {
 				const hits = parseHits(await response.json());
 				return toolResult(formatHits(hits));

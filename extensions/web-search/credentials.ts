@@ -2,20 +2,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getAgentDir } from "../../lib/agent-dir.ts";
 
-export type WebSearchCredentials = {
-  apiKey: string;
-  cseId: string;
-};
+export type WebSearchCredentials = { apiKey: string };
 
-const API_KEY_ENV = ["GOOGLE_SEARCH_API_KEY", "GOOGLE_API_KEY"] as const;
-const CSE_ID_ENV = ["GOOGLE_CSE_ID", "GOOGLE_CUSTOM_SEARCH_ENGINE_ID"] as const;
-const API_KEY_JSON = ["google_search_api_key", "apiKey", "api_key", "GOOGLE_SEARCH_API_KEY", "GOOGLE_API_KEY"] as const;
-const CSE_ID_JSON = ["google_cse_id", "cseId", "cse_id", "cx", "GOOGLE_CSE_ID", "GOOGLE_CUSTOM_SEARCH_ENGINE_ID"] as const;
+const API_KEY_ENV = ["TAVILY_API_KEY"] as const;
+const API_KEY_JSON = ["tavily_api_key", "apiKey", "api_key", "TAVILY_API_KEY"] as const;
+const PLACEHOLDER = "your-tavily-api-key-here";
 
 function nonempty(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  return trimmed.length > 0 && trimmed !== PLACEHOLDER ? trimmed : undefined;
 }
 
 function firstEnv(names: readonly string[]): string | undefined {
@@ -48,7 +44,6 @@ function credentialsFromAuthFile(): Partial<WebSearchCredentials> {
     const record = parsed as Record<string, unknown>;
     return {
       apiKey: firstField(record, API_KEY_JSON),
-      cseId: firstField(record, CSE_ID_JSON),
     };
   } catch {
     return {};
@@ -56,13 +51,6 @@ function credentialsFromAuthFile(): Partial<WebSearchCredentials> {
 }
 
 export function loadCredentials(): WebSearchCredentials | undefined {
-  let apiKey = firstEnv(API_KEY_ENV);
-  let cseId = firstEnv(CSE_ID_ENV);
-  if (!apiKey || !cseId) {
-    const fromFile = credentialsFromAuthFile();
-    apiKey = apiKey ?? fromFile.apiKey;
-    cseId = cseId ?? fromFile.cseId;
-  }
-  if (!apiKey || !cseId) return undefined;
-  return { apiKey, cseId };
+  const apiKey = firstEnv(API_KEY_ENV) ?? credentialsFromAuthFile().apiKey;
+  return apiKey ? { apiKey } : undefined;
 }

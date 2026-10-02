@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`ultimate-pi setup web-search`.** Optional Tavily key prompt at install, stored at `<agentDir>/extensions/web-search/auth.json`.
+- **Worker browser tools and session-audit hardening.** All seven `browser_*` tools in the worker profile, plus session-audit hardening rules in the managed routing block.
+
 - **Session chrome.** A widget above the editor shows that pane's context bar (warning above 70%, error above 90%) and a one-line git dirty summary. `/chrome` hides or shows it for that pane. `/chrome refresh` updates the git line. The parent and each subagent paint their own bar. Children load it because every profile lists the hidden tool `session_chrome`. Pi's footer is unchanged. Extension files apply on `/reload`. Already installed profiles pick up `session_chrome` from `ultimate-pi setup agents`, or from the next spawn after that tool is on the profile.
 
 - **JEV verification choice.** The same triage call now returns `Verification: tests | scout | browser | reviewer`. A worker wave no longer always gets a code reviewer. Tests are the default. A low-confidence verification answer stays on tests.
@@ -26,6 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Extension changes apply on `/reload`. The managed routing block and agent profiles update through `ultimate-pi setup agents`, not from a package update alone.
 
 ### Changed
+
+- **`web_search` uses Tavily.** Set `TAVILY_API_KEY`; the old Google environment variables are no longer read. Requests use bearer-authenticated POST, structured domain filters, bounded result counts, and explicit authentication/rate/usage-limit messages. The secret scanner recognizes Tavily keys.
+- **Pi peer compatibility.** The four `@earendil-works/pi-*` peer dependencies now require `^1.0.0`; the lockfile is refreshed accordingly.
+- **Local graph caches.** `.gitignore` excludes the regenerable `graft/` graph from commits; `.ignore` keeps its cards searchable while excluding graph/cache internals. The managed routing context budget is 17,408 bytes after session-audit hardening.
+
+### Fixed
+
+- **Replaced-session contexts.** Pinned, hash-checked patches protect Cursor 0.5.2, graft 0.1.2, and interactive-subagents 3.7.2 from stale context calls. See [patches/README.md](./patches/README.md) for targets, patch order, and image hashes.
+- **Safe launch updates.** Checkout synchronization and package updates defer while subagents run; launch retries deferred checks up to four times at one-minute intervals. The Plannotator fresh-idle-session persistence guard is restored when its known source marker matches, with a warning if it does not.
+- **Sandboxed child display.** Children load the custom header without expanding their tool grants. Legacy combined stdout/stderr log redirects become stderr-only so the pane keeps its display, and launchers calling the viewer regain a missing viewer import.
+- **Quota continuation.** Short assistant-text `resource_exhausted` errors and the extra-usage-limit response trigger fallback, with a hold flag until continuation is scheduled. Temporary localhost debug-ingest requests have been removed; normal tracing remains opt-in.
+
+### Performance and routing
 
 - **Faster launch.** Playwright loads on the first browser tool or `/browser on`. HTML and PDF converters load on the first conversion. The Cursor catalog scan no longer makes startup wait; `/ModelAgents` "Scan now" still waits. The checkout hash and npm version checks run on the next turn, and `npm view` runs four at a time. Installs stay one at a time.
 

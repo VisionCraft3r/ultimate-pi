@@ -25,7 +25,8 @@
     "packages": { "type": "array", "items": { "type": "string" } },
     "extras": { "type": "object" },
     "openrouterKey": { "type": "string" },
-    "deepseekKey": { "type": "string" }
+    "deepseekKey": { "type": "string" },
+    "tavilyKey": { "type": "string" }
   },
   "$defs": {
     "assignments": {

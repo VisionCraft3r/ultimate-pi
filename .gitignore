@@ -13,3 +13,6 @@ coverage/
 .DS_Store
 *.log
 npm-debug.log*
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

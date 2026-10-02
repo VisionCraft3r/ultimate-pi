@@ -20,6 +20,15 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     after: "4d05e91ce9b1de36c1289a70a40db91407bf284d93c6c9a2ae9501166dec3b24",
   },
   {
+    name: "@schultzp2020/pi-cursor",
+    version: "0.5.2",
+    root: "npm/node_modules/@schultzp2020/pi-cursor",
+    target: "dist/index.js",
+    patch: "pi-cursor-stale-ctx-0.5.2.patch",
+    before: "ac2b0544559910f836e627a8c292ea303492b7100174bf0ca3b30a7cab1fa900",
+    after: "180c81c74411948dfed5b41ad441416cdd172f69fbae58576bc7b3638204664d",
+  },
+  {
     name: "pi-graft",
     version: "0.1.2",
     root: "npm/node_modules/pi-graft",
@@ -37,6 +46,16 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     patch: "pi-graft-subagent-task.patch",
     before: "11502aa5ae65d8b0a8a852c5903fe02982e812e3f1b64d3d1eb4bf458f1ec78e",
     after: "0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4",
+    supersededBy: "0f9002d52221f57fbbcd0bf6d1f5e123f94532eed49a9e051efd0bc55cd91f51",
+  },
+  {
+    name: "pi-graft",
+    version: "0.1.2",
+    root: "npm/node_modules/pi-graft",
+    target: "extensions/graft.ts",
+    patch: "pi-graft-stale-ctx-0.1.2.patch",
+    before: "0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4",
+    after: "0f9002d52221f57fbbcd0bf6d1f5e123f94532eed49a9e051efd0bc55cd91f51",
   },
   {
     name: "pi-interactive-subagents",
@@ -46,6 +65,15 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     patch: "pi-interactive-subagents-activity.patch",
     before: "2f8ef422f668e7e8fddfe084f37ebe6ee44865ce32c2a981a765bb6c213b2c61",
     after: "e37f908e912ade6eebfc4048e7bc71898597f89f630da9f5c2fca1dd1db45324",
+  },
+  {
+    name: "pi-interactive-subagents",
+    version: "3.7.2",
+    root: "git/github.com/amosblomqvist/pi-interactive-subagents",
+    target: "pi-extension/subagents/index.ts",
+    patch: "pi-interactive-subagents-stale-ctx.patch",
+    before: "0a438726c0a9e5bd02d0b87141b41238aae7c39ac2faa4f4a96eb0f5e1ecb1a4",
+    after: "96dfdb1d722fcb6a478ccf919aae698b5f6f2fe6b770145aeca6acb21f711136",
   },
 ]);
 

@@ -144,6 +144,33 @@ function agentDir(): string {
   return process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
 }
 
+/** Marker left in @plannotator/pi-extension after a package update removes the guard. */
+const PLANNOTATOR_UNGUARDED_PERSIST =
+  '\t\tupdateStatus(ctx);\n\t\tupdateWidget(ctx);\n\t\tpersistState();\n\t}\n\n\tpi.on("session_start", async (_event, ctx) => {';
+
+const PLANNOTATOR_GUARDED_PERSIST =
+  "\t\tupdateStatus(ctx);\n\t\tupdateWidget(ctx);\n\t\t// A fresh idle session has nothing to restore. Writing a plannotator\n\t\t// entry here makes PiChamber reject the create (it requires an empty\n\t\t// message list) and puts a plannotator card in the chat.\n\t\tif (stateEntry?.data || phase !== \"idle\") {\n\t\t\tpersistState();\n\t\t}\n\t}\n\n\tpi.on(\"session_start\", async (_event, ctx) => {";
+
+export type PlannotatorGuardResult = "patched" | "already" | "missing" | "unmatched";
+
+export function plannotatorExtensionIndex(root: string): string {
+  return join(root, "npm", "node_modules", "@plannotator", "pi-extension", "index.ts");
+}
+
+/**
+ * PiChamber rejects session create unless the new session has no messages.
+ * Plannotator writes a ledger entry on every fresh idle session, and package
+ * updates restore that write. Put the skip back when it is missing.
+ */
+export function reapplyPlannotatorCreateGuard(indexPath: string): PlannotatorGuardResult {
+  if (!existsSync(indexPath)) return "missing";
+  const text = readFileSync(indexPath, "utf8");
+  if (text.includes('if (stateEntry?.data || phase !== "idle")')) return "already";
+  if (!text.includes(PLANNOTATOR_UNGUARDED_PERSIST)) return "unmatched";
+  writeFileSync(indexPath, text.replace(PLANNOTATOR_UNGUARDED_PERSIST, PLANNOTATOR_GUARDED_PERSIST));
+  return "patched";
+}
+
 function resolvePiBinary(): string {
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {
     if (!dir) continue;
@@ -267,6 +294,31 @@ function hashTree(root: string): string {
   return hash.digest("hex");
 }
 
+export const SUBAGENT_SYNC_DEFER = "deferred Ultimate PI sync; subagents are running";
+
+/** Same symbol the interactive-subagents extension publishes for in-flight children. */
+export function runningSubagentCount(): number {
+  const reader = (globalThis as Record<symbol, unknown>)[Symbol.for("pi-subagents/running-children-count")];
+  if (typeof reader !== "function") return 0;
+  try {
+    const count = reader();
+    return typeof count === "number" && Number.isFinite(count) && count > 0 ? count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function subagentSyncBlock(): string | null {
+  return runningSubagentCount() > 0 ? SUBAGENT_SYNC_DEFER : null;
+}
+
+/** Copy the checkout only when no subagent pane is in flight. A copy reloads Pi and aborts those panes. */
+export function copySourceIfIdle(source: string, dest: string): { deferred: string } | { skipped: string[] } {
+  const blocked = subagentSyncBlock();
+  if (blocked) return { deferred: blocked };
+  return { skipped: copySource(source, dest) };
+}
+
 export function copySource(source: string, dest: string): string[] {
   const skipped: string[] = [];
   for (const dir of SYNC_DIRS) {
@@ -282,6 +334,10 @@ export function copySource(source: string, dest: string): string[] {
 }
 
 async function syncSource(dir: string, options: { skipTests: boolean }): Promise<string> {
+  // A running pane shares this process's extension files. Do not hash, test, or
+  // copy while one is alive: the test run is a second Node process, and the
+  // copy reloads Pi under the pane.
+  if (runningSubagentCount() > 0) return SUBAGENT_SYNC_DEFER;
   const source = findUltimatePiSource();
   if (!source) return "no Ultimate PI checkout to sync";
   const next = hashTree(source);
@@ -294,7 +350,9 @@ async function syncSource(dir: string, options: { skipTests: boolean }): Promise
       return `held Ultimate PI sync; tests failed (${tested.stderr.split("\n").find((line) => line.trim()) || "see test output"})`;
     }
   }
-  const skipped = copySource(source, dir);
+  const copied = copySourceIfIdle(source, dir);
+  if ("deferred" in copied) return copied.deferred;
+  const skipped = copied.skipped;
   const previous = readJson(statePath) ?? {};
   writeFileSync(statePath, `${JSON.stringify({ ...previous, hash: next, at: new Date().toISOString() }, null, 2)}\n`);
   const note = "synced Ultimate PI checkout into the agent dir";
@@ -369,7 +427,15 @@ export async function runLaunchUpdate(options: { skipNetwork?: boolean; skipTest
   writeFileSync(lock, String(process.pid));
   try {
     const notes = [await syncSource(dir, { skipTests: options.skipTests === true })];
-    if (!options.skipNetwork) {
+    const agentsRunning = runningSubagentCount() > 0;
+    if (!agentsRunning) {
+      const plannotatorGuard = reapplyPlannotatorCreateGuard(plannotatorExtensionIndex(dir));
+      if (plannotatorGuard === "patched") notes.push("restored Plannotator fresh-session guard");
+      if (plannotatorGuard === "unmatched") {
+        notes.push("Plannotator fresh-session guard did not match; new chats may fail to create");
+      }
+    }
+    if (!options.skipNetwork && !agentsRunning) {
       const statePath = join(dir, "ultimate-pi-launch.json");
       const state = readJson(statePath);
       if (npmCheckDue(state?.checkedAt)) {
@@ -377,6 +443,10 @@ export async function runLaunchUpdate(options: { skipNetwork?: boolean; skipTest
         const current = readJson(statePath) ?? {};
         writeFileSync(statePath, `${JSON.stringify({ ...current, checkedAt: new Date().toISOString() }, null, 2)}\n`);
       }
+    } else if (!options.skipNetwork && agentsRunning && !notes.includes(SUBAGENT_SYNC_DEFER)) {
+      const statePath = join(dir, "ultimate-pi-launch.json");
+      const state = readJson(statePath);
+      if (npmCheckDue(state?.checkedAt)) notes.push(SUBAGENT_SYNC_DEFER);
     }
     return notes.filter((note) => note.length > 0);
   } finally {

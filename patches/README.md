@@ -33,6 +33,26 @@ validate/normalize), instead of rejecting the snapshot:
 This keeps snapshots valid when a provider embeds a newline in a tool id
 (for example Cursor-style `call-1\nfc_2`).
 
+## `pi-interactive-subagents-stale-ctx.patch`
+
+| | |
+| --- | --- |
+| Package | [`pi-interactive-subagents`](https://github.com/amosblomqvist/pi-interactive-subagents) **3.7.2** |
+| Pinned git commit | `c3e8b53c0754ae5ccc19fdab5a7481ec039bc2f7` (`main`, 2026-08-25, "updated readme and test") |
+| Target file | `pi-extension/subagents/index.ts` |
+| Pre-image blob (`git rev-parse HEAD:pi-extension/subagents/index.ts`) | `7e20a0fcec3a9316eaeba1d6957f1893b18163f7` |
+| Post-image blob | `2266f5a7a8e82aa9c358ec39a7dd53420ebf38f1` |
+| Pre-image SHA-256 | `0a438726c0a9e5bd02d0b87141b41238aae7c39ac2faa4f4a96eb0f5e1ecb1a4` |
+| Post-image SHA-256 | `96dfdb1d722fcb6a478ccf919aae698b5f6f2fe6b770145aeca6acb21f711136` |
+
+### Intended behavior
+
+Status updates, questions, and subagent results are delivered through
+`deliverToParent`. A session Pi has already replaced cannot accept that steer.
+The call returns without throwing, so the tmux child stays up. The child
+session file still holds the result. This file is independent of the activity
+patch.
+
 ## `pi-graft-async-0.1.2.patch`
 
 | | |
@@ -56,6 +76,28 @@ This keeps snapshots valid when a provider embeds a newline in a tool id
 | Post-image SHA-256 | `0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4` |
 
 Applies after the async patch. In a subagent (`PI_SUBAGENT_AGENT`), graft does not append the orientation message. That message was the next turn after the task file, and the worker answered it with `graft_repo_map` and then exited. The task line is added to the system prompt instead: the user message, including text inside a `<file>` tag, is the task. Parent sessions still get the orientation message.
+
+## `pi-graft-stale-ctx-0.1.2.patch`
+
+| | |
+| --- | --- |
+| Package | [`pi-graft`](https://www.npmjs.com/package/pi-graft) **0.1.2** |
+| Target file | `extensions/graft.ts` |
+| Pre-image SHA-256 | `0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4` |
+| Post-image SHA-256 | `0f9002d52221f57fbbcd0bf6d1f5e123f94532eed49a9e051efd0bc55cd91f51` |
+
+Applies after the subagent-task patch. `session_start` and `turn_end` read the session context inside the existing try/catch. A live session still refreshes status and tallies graft usage. A context that Pi has already replaced returns without failing the turn.
+
+## `pi-cursor-stale-ctx-0.5.2.patch`
+
+| | |
+| --- | --- |
+| Package | [`@schultzp2020/pi-cursor`](https://www.npmjs.com/package/@schultzp2020/pi-cursor) **0.5.2** |
+| Target file | `dist/index.js` |
+| Pre-image SHA-256 | `ac2b0544559910f836e627a8c292ea303492b7100174bf0ca3b30a7cab1fa900` |
+| Post-image SHA-256 | `180c81c74411948dfed5b41ad441416cdd172f69fbae58576bc7b3638204664d` |
+
+`session_start` and `before_provider_request` ignore a replaced session context. A live Cursor request still attaches the session id and working directory. If the context throws, the original provider payload is returned unchanged.
 
 ## `pi-cursor-idle-0.5.2.patch`
 

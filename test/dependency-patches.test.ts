@@ -41,8 +41,10 @@ async function writeFixture(agentDir: string, { version = DESCRIPTOR.version, bo
 test("pi-graft async patch is pinned to the published 0.1.2 preimage", () => {
   const graft = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-graft-async-0.1.2.patch");
   const follow = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-graft-subagent-task.patch");
+  const stale = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-graft-stale-ctx-0.1.2.patch");
   assert.ok(graft);
   assert.ok(follow);
+  assert.ok(stale);
   assert.equal(graft.version, "0.1.2");
   assert.equal(graft.target, "extensions/graft.ts");
   assert.equal(graft.before, "663479e235ac247211f64e5d6015995d8cff04e33726fc639eaa0b1edfe5e6bb");
@@ -50,7 +52,24 @@ test("pi-graft async patch is pinned to the published 0.1.2 preimage", () => {
   assert.equal(follow.before, graft.after);
   assert.equal(follow.after, "0e80c4207393e90cd862514cc6e4ef3c5b0cf925a770f89cc2b32c7b277503a4");
   assert.equal(graft.supersededBy, follow.after);
+  assert.equal(stale.before, follow.after);
+  assert.equal(stale.after, "0f9002d52221f57fbbcd0bf6d1f5e123f94532eed49a9e051efd0bc55cd91f51");
+  assert.equal(follow.supersededBy, stale.after);
   assert.ok(DEPENDENCY_PATCHES.indexOf(follow) > DEPENDENCY_PATCHES.indexOf(graft));
+  assert.ok(DEPENDENCY_PATCHES.indexOf(stale) > DEPENDENCY_PATCHES.indexOf(follow));
+  const cursor = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-cursor-stale-ctx-0.5.2.patch");
+  assert.ok(cursor);
+  assert.equal(cursor.version, "0.5.2");
+  assert.equal(cursor.target, "dist/index.js");
+  assert.equal(cursor.before, "ac2b0544559910f836e627a8c292ea303492b7100174bf0ca3b30a7cab1fa900");
+  assert.equal(cursor.after, "180c81c74411948dfed5b41ad441416cdd172f69fbae58576bc7b3638204664d");
+  const subagents = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-interactive-subagents-stale-ctx.patch");
+  assert.ok(subagents);
+  assert.equal(subagents.name, "pi-interactive-subagents");
+  assert.equal(subagents.version, "3.7.2");
+  assert.equal(subagents.target, "pi-extension/subagents/index.ts");
+  assert.equal(subagents.before, "0a438726c0a9e5bd02d0b87141b41238aae7c39ac2faa4f4a96eb0f5e1ecb1a4");
+  assert.equal(subagents.after, "96dfdb1d722fcb6a478ccf919aae698b5f6f2fe6b770145aeca6acb21f711136");
 });
 
 test("ready when target matches the before hash", async () => {

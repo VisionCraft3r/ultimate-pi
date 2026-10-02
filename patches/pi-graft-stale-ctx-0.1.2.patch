@@ -1,0 +1,27 @@
+--- a/extensions/graft.ts
++++ b/extensions/graft.ts
+@@ -592,8 +592,10 @@
+   }
+ 
+   pi.on("session_start", async (_event, ctx) => {
+-    try { oriented.delete(`${sid(ctx)}@${ctx.cwd}`); } catch { /* ignore */ }
+-    await refreshStatus(ctx, ctx.cwd);
++    try {
++      oriented.delete(`${sid(ctx)}@${ctx.cwd}`);
++      await refreshStatus(ctx, ctx.cwd);
++    } catch { /* a replaced session must not fail the turn */ }
+   });
+ 
+   // SessionStart + UserPromptSubmit hooks, combined: orientation once per
+@@ -721,9 +723,9 @@
+   // Only runs on turns the savings hook flagged, and duplicate ends can't
+   // double-count (lastTallyUuid), mirroring graft's tally.
+   pi.on("turn_end", async (event, ctx) => {
+-    const cwd = ctx.cwd;
+-    if (!hasGraph(cwd)) return;
+     try {
++      const cwd = ctx.cwd;
++      if (!hasGraph(cwd)) return;
+       const id = sid(ctx);
+       const s = readSession(cwd, id);
+       if (!s.turnUsedGraft) return;
