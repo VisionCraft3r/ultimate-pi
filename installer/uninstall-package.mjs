@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeFileAtomic } from "../lib/atomic-write.ts";
 
 const SETTINGS_FILE = "settings.json";
 const MODEL_AGENTS_FILE = "model-agents.json";
@@ -161,7 +162,7 @@ export async function removeUltimatePiPackage(agentDir, backupSession, options =
   await backupSession.backupIfExists(SETTINGS_FILE);
 
   const next = { ...parsed, packages };
-  await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  await writeFileAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   return withFullExtras(agentDir, backupSession, options, { removed, packages });
 }
 

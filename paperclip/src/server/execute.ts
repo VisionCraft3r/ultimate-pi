@@ -1,11 +1,13 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildPiArgs,
   deliverKeysArgs,
+  envFileText,
+  isValidEnvKey,
   parkedPaneTarget,
   pipePaneArgs,
   paperclipChildEnv,
@@ -81,7 +83,7 @@ function stringEnv(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const env: Record<string, string> = {};
   for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof entry === "string") env[key] = entry;
+    if (typeof entry === "string" && isValidEnvKey(key)) env[key] = entry;
   }
   return env;
 }
@@ -268,17 +270,17 @@ export async function recordRunDisposition(input: {
 }): Promise<void> {
   if (!input.issueId || !input.companyId) return;
   const fetchImpl = input.fetchImpl ?? fetch;
-  const issue = await paperclipRequest("GET", `/issues/${input.issueId}`, input.authToken, undefined, fetchImpl) as { status?: string } | null;
+  const issue = await paperclipRequest("GET", `/issues/${encodeURIComponent(input.issueId)}`, input.authToken, undefined, fetchImpl) as { status?: string } | null;
   if (!issue?.status) return;
-  const listed = await paperclipRequest("GET", `/companies/${input.companyId}/issues?parentId=${input.issueId}`, input.authToken, undefined, fetchImpl);
+  const listed = await paperclipRequest("GET", `/companies/${encodeURIComponent(input.companyId)}/issues?parentId=${encodeURIComponent(input.issueId)}`, input.authToken, undefined, fetchImpl);
   const openChildIds = issueList(listed)
     .filter((child) => child.id && child.id !== input.issueId && OPEN_CHILD_STATUSES.has(child.status ?? ""))
     .map((child) => child.id as string);
   const status = chooseRunDisposition(issue.status, openChildIds);
   if (!status) return;
   const comment = input.summary.trim() || (status === "blocked" ? "Waiting on delegated sub-tasks." : "Run finished.");
-  await paperclipRequest("POST", `/issues/${input.issueId}/comments`, input.authToken, { body: comment }, fetchImpl);
-  const updated = await paperclipMutation("PATCH", `/issues/${input.issueId}`, input.authToken, status === "blocked"
+  await paperclipRequest("POST", `/issues/${encodeURIComponent(input.issueId)}/comments`, input.authToken, { body: comment }, fetchImpl);
+  const updated = await paperclipMutation("PATCH", `/issues/${encodeURIComponent(input.issueId)}`, input.authToken, status === "blocked"
     ? { status, blockedByIssueIds: openChildIds }
     : { status }, fetchImpl) as { status?: string } | null;
   if (!updated?.status || updated.status === "in_progress") {
@@ -293,10 +295,10 @@ export async function releaseMirrorIssue(input: {
 }): Promise<void> {
   if (!input.issueId) return;
   const fetchImpl = input.fetchImpl ?? fetch;
-  const issue = await paperclipRequest("GET", `/issues/${input.issueId}`, input.authToken, undefined, fetchImpl) as { status?: string; assigneeAgentId?: string | null } | null;
+  const issue = await paperclipRequest("GET", `/issues/${encodeURIComponent(input.issueId)}`, input.authToken, undefined, fetchImpl) as { status?: string; assigneeAgentId?: string | null } | null;
   if (!issue?.status || issue.status === "done" || issue.status === "cancelled") return;
   if (issue.status === "todo" && !issue.assigneeAgentId) return;
-  const updated = await paperclipMutation("PATCH", `/issues/${input.issueId}`, input.authToken, {
+  const updated = await paperclipMutation("PATCH", `/issues/${encodeURIComponent(input.issueId)}`, input.authToken, {
     status: "todo",
     assigneeAgentId: null,
   }, fetchImpl) as { status?: string; assigneeAgentId?: string | null } | null;
@@ -311,7 +313,7 @@ export async function readIssueDescription(issueId: string, authToken?: string, 
   const headers: Record<string, string> = {};
   if (authToken) headers.authorization = `Bearer ${authToken}`;
   try {
-    const response = await fetchImpl(`http://127.0.0.1:${port}/api/issues/${issueId}`, { headers });
+    const response = await fetchImpl(`http://127.0.0.1:${port}/api/issues/${encodeURIComponent(issueId)}`, { headers });
     if (!response.ok) return "";
     const body = await response.json() as { description?: unknown };
     return typeof body.description === "string" ? body.description : "";
@@ -384,123 +386,130 @@ export async function execute(ctx: ExecuteContext): Promise<RunResult> {
     sessionFile,
   });
   const session = sessionName(ctx.agent.id);
-  const logPath = join(tmpdir(), `${session}-${ctx.runId}.log`);
-  writeFileSync(logPath, "");
-  const env = paperclipChildEnv({
-    agentId: ctx.agent.id,
-    companyId: ctx.agent.companyId,
-    runId: ctx.runId,
-    authToken: ctx.authToken,
-    agentDir,
-    context: ctx.context,
-    extraEnv: stringEnv(ctx.config.env),
-  });
-  const updater = join(ultimatePiRoot(), "lib/launch-update.ts");
-  const update = spawn(process.execPath, ["--experimental-strip-types", updater, "--sync-only"], {
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, ULTIMATE_PI_ROOT: ultimatePiRoot() },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let updateLog = "";
-  update.stdout?.setEncoding("utf8");
-  update.stderr?.setEncoding("utf8");
-  update.stdout?.on("data", (chunk) => {
-    updateLog += chunk;
-  });
-  update.stderr?.on("data", (chunk) => {
-    updateLog += chunk;
-  });
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(() => {
-      update.kill("SIGTERM");
-      resolve();
-    }, 180000);
-    update.on("close", () => {
-      clearTimeout(timer);
-      resolve();
-    });
-    update.on("error", () => {
-      clearTimeout(timer);
-      resolve();
-    });
-  });
-  if (updateLog.trim()) await ctx.onLog("stderr", `[ultimate-pi] ${updateLog.trim()}\n`);
-  const layout = join(ultimatePiRoot(), "lib/extension-layout.ts");
-  const layoutCheck = spawnSync(process.execPath, ["--experimental-strip-types", layout, "--check", agentDir], { encoding: "utf8" });
-  if (layoutCheck.status !== 0) {
-    return {
-      exitCode: 1,
-      signal: null,
-      timedOut: false,
-      errorMessage: (layoutCheck.stdout || layoutCheck.stderr || "extension layout check failed").trim(),
-    };
-  }
-  const piBinary = resolvePiBinary();
-  await ctx.onLog("stderr", `[ultimate-pi] tmux session ${session} persona ${persona.name}\n`);
-  const started = await runTmux(
-    tmuxNewSessionArgs({ session, cwd, piBinary, args, env }),
-    15000,
-  );
-  if (started.code !== 0) {
-    return {
-      exitCode: started.code,
-      signal: null,
-      timedOut: false,
-      errorMessage: started.stderr || started.stdout || "tmux new-session failed",
-    };
-  }
-  await runTmux(pipePaneArgs(session, logPath), 5000);
-  const comment = asString(ctx.context.wakeComment);
-  if (comment) {
-    const panes = await runTmux(["list-panes", "-t", session, "-F", "#{pane_id}"], 5000);
-    const ids = panes.stdout.split(/\n/).map((line) => line.trim()).filter(Boolean);
-    const target = parkedPaneTarget(session, ids);
-    for (const keys of deliverKeysArgs(target, comment)) {
-      await runTmux(keys, 5000);
-    }
-  }
-  const timeoutSec = timeoutSeconds(ctx.config.runLimitSec ?? ctx.config.timeoutSec);
-  const timedOut = await waitForExit(session, logPath, ctx.onLog, timeoutSec);
-  if (timedOut) {
-    await runTmux(["kill-session", "-t", session], 5000);
-  }
-  const { readFileSync } = await import("node:fs");
-  let stdout = "";
+  const runDir = mkdtempSync(join(tmpdir(), "paperclip-run-"));
   try {
-    stdout = readFileSync(logPath, "utf8");
-  } catch {
-    stdout = "";
-  }
-  const parsed = parsePiJsonl(stdout);
-  const startup = extensionStartupError(stdout);
-  if (startup) parsed.errors.unshift(startup);
-  const spec = persona.model.includes("/") ? persona.model.split("/") : [];
-  const succeeded = !timedOut && parsed.errors.length === 0;
-  const summary = deliverableSummary(parsed.messages);
-  if (succeeded) {
-    try {
-      await recordRunDisposition({
-        issueId,
-        companyId: ctx.agent.companyId,
-        authToken: ctx.authToken,
-        summary,
+    const logPath = join(runDir, "pane.log");
+    writeFileSync(logPath, "", { mode: 0o600, flag: "wx" });
+    const env = paperclipChildEnv({
+      agentId: ctx.agent.id,
+      companyId: ctx.agent.companyId,
+      runId: ctx.runId,
+      authToken: ctx.authToken,
+      agentDir,
+      context: ctx.context,
+      extraEnv: stringEnv(ctx.config.env),
+    });
+    const envFile = join(runDir, "env.sh");
+    writeFileSync(envFile, envFileText(env), { mode: 0o600, flag: "wx" });
+    const updater = join(ultimatePiRoot(), "lib/launch-update.ts");
+    const update = spawn(process.execPath, ["--experimental-strip-types", updater, "--sync-only"], {
+      env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, ULTIMATE_PI_ROOT: ultimatePiRoot() },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let updateLog = "";
+    update.stdout?.setEncoding("utf8");
+    update.stderr?.setEncoding("utf8");
+    update.stdout?.on("data", (chunk) => {
+      updateLog += chunk;
+    });
+    update.stderr?.on("data", (chunk) => {
+      updateLog += chunk;
+    });
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        update.kill("SIGTERM");
+        resolve();
+      }, 180000);
+      update.on("close", () => {
+        clearTimeout(timer);
+        resolve();
       });
-    } catch (err) {
-      await ctx.onLog("stderr", `[ultimate-pi] disposition failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      update.on("error", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    if (updateLog.trim()) await ctx.onLog("stderr", `[ultimate-pi] ${updateLog.trim()}\n`);
+    const layout = join(ultimatePiRoot(), "lib/extension-layout.ts");
+    const layoutCheck = spawnSync(process.execPath, ["--experimental-strip-types", layout, "--check", agentDir], { encoding: "utf8" });
+    if (layoutCheck.status !== 0) {
+      return {
+        exitCode: 1,
+        signal: null,
+        timedOut: false,
+        errorMessage: (layoutCheck.stdout || layoutCheck.stderr || "extension layout check failed").trim(),
+      };
     }
+    const piBinary = resolvePiBinary();
+    await ctx.onLog("stderr", `[ultimate-pi] tmux session ${session} persona ${persona.name}\n`);
+    const started = await runTmux(
+      tmuxNewSessionArgs({ session, cwd, piBinary, args, envFile }),
+      15000,
+    );
+    if (started.code !== 0) {
+      return {
+        exitCode: started.code,
+        signal: null,
+        timedOut: false,
+        errorMessage: started.stderr || started.stdout || "tmux new-session failed",
+      };
+    }
+    await runTmux(pipePaneArgs(session, logPath), 5000);
+    const comment = asString(ctx.context.wakeComment);
+    if (comment) {
+      const panes = await runTmux(["list-panes", "-t", session, "-F", "#{pane_id}"], 5000);
+      const ids = panes.stdout.split(/\n/).map((line) => line.trim()).filter(Boolean);
+      const target = parkedPaneTarget(session, ids);
+      for (const keys of deliverKeysArgs(target, comment)) {
+        await runTmux(keys, 5000);
+      }
+    }
+    const timeoutSec = timeoutSeconds(ctx.config.runLimitSec ?? ctx.config.timeoutSec);
+    const timedOut = await waitForExit(session, logPath, ctx.onLog, timeoutSec);
+    if (timedOut) {
+      await runTmux(["kill-session", "-t", session], 5000);
+    }
+    const { readFileSync } = await import("node:fs");
+    let stdout = "";
+    try {
+      stdout = readFileSync(logPath, "utf8");
+    } catch {
+      stdout = "";
+    }
+    const parsed = parsePiJsonl(stdout);
+    const startup = extensionStartupError(stdout);
+    if (startup) parsed.errors.unshift(startup);
+    const spec = persona.model.includes("/") ? persona.model.split("/") : [];
+    const succeeded = !timedOut && parsed.errors.length === 0;
+    const summary = deliverableSummary(parsed.messages);
+    if (succeeded) {
+      try {
+        await recordRunDisposition({
+          issueId,
+          companyId: ctx.agent.companyId,
+          authToken: ctx.authToken,
+          summary,
+        });
+      } catch (err) {
+        await ctx.onLog("stderr", `[ultimate-pi] disposition failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
+    }
+    return {
+      exitCode: timedOut ? null : parsed.errors.length > 0 ? 1 : 0,
+      signal: null,
+      timedOut,
+      errorMessage: parsed.errors[0] ?? null,
+      usage: { inputTokens: parsed.usage.inputTokens, outputTokens: parsed.usage.outputTokens },
+      costUsd: parsed.usage.costUsd,
+      provider: spec[0] ?? null,
+      model: spec.slice(1).join("/") || null,
+      summary: summary || null,
+      resultJson: summary ? { summary } : undefined,
+      sessionParams: { sessionId: sessionFile, cwd, tmuxSession: session },
+    };
+  } finally {
+    rmSync(runDir, { recursive: true, force: true });
   }
-  return {
-    exitCode: timedOut ? null : parsed.errors.length > 0 ? 1 : 0,
-    signal: null,
-    timedOut,
-    errorMessage: parsed.errors[0] ?? null,
-    usage: { inputTokens: parsed.usage.inputTokens, outputTokens: parsed.usage.outputTokens },
-    costUsd: parsed.usage.costUsd,
-    provider: spec[0] ?? null,
-    model: spec.slice(1).join("/") || null,
-    summary: summary || null,
-    resultJson: summary ? { summary } : undefined,
-    sessionParams: { sessionId: sessionFile, cwd, tmuxSession: session },
-  };
 }
 
 export async function deliverToParkedPane(agentId: string, text: string): Promise<void> {

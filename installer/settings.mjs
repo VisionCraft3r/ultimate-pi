@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeFileAtomic } from "../lib/atomic-write.ts";
 import { createBackupSession } from "./backup.mjs";
 import { renderAgentTemplates } from "./render-agents.mjs";
 import {
@@ -14,6 +15,9 @@ import {
 } from "./schema.mjs";
 import { writeModelConfig } from "./write-model-config.mjs";
 import { applyEnabledExtras } from "./extras.mjs";
+
+/** Known-good Cursor provider. 0.5.3 fails to import `@earendil-works/pi-ai` and aborts launch. */
+export const CURSOR_PACKAGE = "npm:@schultzp2020/pi-cursor@0.5.2";
 
 const SETTINGS_FILE = "settings.json";
 const AGENTS_MD_FILE = "AGENTS.md";
@@ -40,6 +44,26 @@ async function readJson(file, fallback) {
     if (err.code === "ENOENT") return fallback;
     throw err;
   }
+}
+
+/** Collapse any Cursor package spec onto the pinned 0.5.2 spec. Other packages stay. */
+export function pinCursorPackageSpec(packages) {
+  if (!Array.isArray(packages)) return packages;
+  let saw = false;
+  const next = [];
+  for (const spec of packages) {
+    if (typeof spec !== "string") {
+      next.push(spec);
+      continue;
+    }
+    if (spec === "npm:@schultzp2020/pi-cursor" || spec.startsWith("npm:@schultzp2020/pi-cursor@")) {
+      saw = true;
+      continue;
+    }
+    next.push(spec);
+  }
+  if (saw && !next.includes(CURSOR_PACKAGE)) next.push(CURSOR_PACKAGE);
+  return next;
 }
 
 /** Shallow-merge arrays by de-duped union, objects recursively, scalars overwritten by `patch`. */
@@ -118,8 +142,9 @@ export async function mergeSettings(agentDir, patch) {
   const file = settingsPath(agentDir);
   const existing = await readJson(file, {});
   const next = deepMergePreserving(existing, patch);
+  if (Array.isArray(next.packages)) next.packages = pinCursorPackageSpec(next.packages);
   await fs.mkdir(agentDir, { recursive: true });
-  await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  await writeFileAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }
 
@@ -143,7 +168,7 @@ export async function applyPreferenceDefaults(agentDir, { memoryInstalled = fals
     };
   }
   await fs.mkdir(agentDir, { recursive: true });
-  await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  await writeFileAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }
 

@@ -1,0 +1,46 @@
+--- a/pi-extension/subagents/index.ts
++++ b/pi-extension/subagents/index.ts
+@@ -579,6 +579,24 @@
+   return !(agentDefs?.autoExit ?? false);
+ }
+ 
++/**
++ * Resume should follow a global agent-model edit made after the spawn snapshot
++ * was written. Tools, identity, cwd, and the spawn whitelist stay on that snapshot.
++ * A missing profile keeps the snapshotted model.
++ */
++function withGlobalAgentModel(loadout: SubagentLoadout): SubagentLoadout {
++  if (!loadout.agent) return loadout;
++  const profilePath = join(getAgentConfigDir(), "agents", `${loadout.agent}.md`);
++  if (!existsSync(profilePath)) return loadout;
++  const parsed = parseAgentDefinition(readFileSync(profilePath, "utf8"), loadout.agent);
++  if (!parsed) return loadout;
++  return {
++    ...loadout,
++    model: parsed.model || loadout.model,
++    thinking: parsed.thinking || loadout.thinking,
++  };
++}
++
+ function loadAgentDefaults(agentName: string): AgentDefaults | null {
+   const configDir = getAgentConfigDir();
+   const paths = [
+@@ -2937,8 +2955,8 @@
+         // Reconstruct the sandbox from the snapshot written at spawn time.
+         // Without it we cannot safely resume: relaunching bare would load every
+         // global extension + the full toolset. Refuse rather than escalate.
+-        const loadout = readSubagentLoadout(sessionPath);
+-        if (!loadout) {
++        const snapshotted = readSubagentLoadout(sessionPath);
++        if (!snapshotted) {
+           const err =
+             `Cannot safely resume "${requestedName}": no sandbox snapshot found for this session ` +
+             `(it predates sandboxed resume, or its .loadout.json sidecar was removed). ` +
+@@ -2946,6 +2964,7 @@
+             `Re-run the task as a fresh subagent instead.`;
+           return { content: [{ type: "text" as const, text: err }], details: { error: err } };
+         }
++        const loadout = withGlobalAgentModel(snapshotted);
+ 
+         const resumedSessionId = entry.sessionId ?? getSessionId(sessionPath) ?? requestedName;
+ 

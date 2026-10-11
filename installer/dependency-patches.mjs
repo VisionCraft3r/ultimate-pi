@@ -121,6 +121,16 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     patch: "pi-interactive-subagents-stale-ctx.patch",
     before: "0a438726c0a9e5bd02d0b87141b41238aae7c39ac2faa4f4a96eb0f5e1ecb1a4",
     after: "96dfdb1d722fcb6a478ccf919aae698b5f6f2fe6b770145aeca6acb21f711136",
+    supersededBy: "b27026a706942d8d48deda125833ea53871ad56f72532908dcbbe697e9de9b57",
+  },
+  {
+    name: "pi-interactive-subagents",
+    version: "3.7.2",
+    root: "git/github.com/amosblomqvist/pi-interactive-subagents",
+    target: "pi-extension/subagents/index.ts",
+    patch: "pi-interactive-subagents-global-model.patch",
+    before: "4dd93c7f05b4c8ad0c97ad3fbd92d995678edfaf2fc79aa9e24884b880ba0eb9",
+    after: "b27026a706942d8d48deda125833ea53871ad56f72532908dcbbe697e9de9b57",
   },
 ]);
 

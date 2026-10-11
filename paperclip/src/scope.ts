@@ -1,6 +1,14 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PersonaFrontmatter } from "./personas.ts";
+
+/** Write `text` to `path` without ever leaving a partially-written file: write a pid-scoped
+ * temp file in the same directory, then atomically rename it over the target. */
+export function writeFileAtomic(path: string, text: string): void {
+  const tmpPath = `${path}.tmp-${process.pid}`;
+  writeFileSync(tmpPath, text);
+  renameSync(tmpPath, path);
+}
 
 export type ModelRef = { provider: string; id: string };
 
@@ -31,7 +39,7 @@ export function writeEnabledModels(agentDir: string, models: readonly string[]):
   const settings = JSON.parse(readFileSync(path, "utf8")) as { enabledModels?: unknown };
   const next = [...new Set(models.map((model) => model.trim()).filter((model) => model.includes("/")))];
   settings.enabledModels = next;
-  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+  writeFileAtomic(path, `${JSON.stringify(settings, null, 2)}\n`);
   return next;
 }
 
@@ -73,13 +81,20 @@ export function replaceThinkingLine(markdown: string, level: string): string | u
   return `${head}\nthinking: ${level}${rest}`;
 }
 
+export const PERSONA_NAME_RE = /^[a-z0-9_-]+$/;
+
+export function assertPersonaName(name: string): void {
+  if (!PERSONA_NAME_RE.test(name)) throw new Error(`invalid persona name: ${name}`);
+}
+
 export function writePersonaThinking(agentDir: string, persona: string, level: string): void {
+  assertPersonaName(persona);
   if (!isThinkingLevel(level)) throw new Error(`thinking level must be one of ${THINKING_LEVELS.join(", ")}`);
   const path = join(agentDir, "agents", `${persona}.md`);
   const text = readFileSync(path, "utf8");
   const next = replaceThinkingLine(text, level);
   if (!next) throw new Error(`no frontmatter in agents/${persona}.md`);
-  writeFileSync(path, next);
+  writeFileAtomic(path, next);
 }
 
 export function replaceModelLine(markdown: string, modelRef: string): string | undefined {
@@ -91,12 +106,13 @@ export function replaceModelLine(markdown: string, modelRef: string): string | u
 }
 
 export function writePersonaModel(agentDir: string, persona: string, modelRef: string, scoped: readonly string[]): void {
+  assertPersonaName(persona);
   assertInScope(modelRef, scoped);
   const path = join(agentDir, "agents", `${persona}.md`);
   const text = readFileSync(path, "utf8");
   const next = replaceModelLine(text, modelRef);
   if (!next) throw new Error(`no model: line in agents/${persona}.md`);
-  writeFileSync(path, next);
+  writeFileAtomic(path, next);
 }
 
 export type FallbackFile = {
@@ -130,7 +146,7 @@ export function writeProviderFallback(
     ...current,
     fallbacks: { ...(current.fallbacks ?? {}), [provider]: specs },
   };
-  writeFileSync(join(agentDir, "model-agents.json"), `${JSON.stringify(next, null, 2)}\n`);
+  writeFileAtomic(join(agentDir, "model-agents.json"), `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }
 

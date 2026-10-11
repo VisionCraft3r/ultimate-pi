@@ -7,6 +7,7 @@ import { createBackupSession } from "./backup.mjs";
 import { DEPENDENCY_PATCHES, applyDependencyPatch, dependencyPatchApplies } from "./dependency-patches.mjs";
 import { applyEditGuardChildGate } from "./edit-guard-child.mjs";
 import { applyScoutChildLaunch } from "./scout-child.mjs";
+import { CURSOR_PACKAGE } from "./settings.mjs";
 import { applyStaleBoundaryPatch } from "./stale-boundary.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -244,7 +245,7 @@ export async function configurePackagesAndKeys(
   if (installBmad && !packages.includes(BMAD_PACKAGE)) packages.push(BMAD_PACKAGE);
   if (deepseekKey) packages.push("git:github.com/amosblomqvist/pi-observational-memory");
   if (ids.includes("anthropic")) packages.push("npm:@gotgenes/pi-anthropic-auth");
-  if (ids.includes("cursor")) packages.push("npm:@schultzp2020/pi-cursor");
+  if (ids.includes("cursor")) packages.push(CURSOR_PACKAGE);
 
   const unique = [...new Set(packages)];
   assertGitAvailableForSpecs(unique, options);

@@ -145,7 +145,7 @@ export async function createMirrorIssue(input: {
   const marker = mirrorMarker(input.launch.name);
   const listed = await paperclipFetch(
     input.env,
-    `/api/companies/${input.env.companyId}/issues?parentId=${encodeURIComponent(input.env.taskId)}`,
+    `/api/companies/${encodeURIComponent(input.env.companyId)}/issues?parentId=${encodeURIComponent(input.env.taskId)}`,
     request,
   );
   if (listed.ok) {
@@ -155,7 +155,7 @@ export async function createMirrorIssue(input: {
       (issue.description ?? "").includes(marker));
     if (existing?.id) return existing.id;
   }
-  const created = await paperclipFetch(input.env, `/api/issues/${input.env.taskId}/children`, request, {
+  const created = await paperclipFetch(input.env, `/api/issues/${encodeURIComponent(input.env.taskId)}/children`, request, {
     method: "POST",
     body: JSON.stringify({
       title: input.launch.name,
@@ -177,12 +177,12 @@ export async function closeMirrorIssue(input: {
   const request = input.fetchImpl ?? fetch;
   const status = closeStatus(input.close.exitCode);
   const body = input.close.content.trim() || `Subagent ${input.close.name} finished with status ${status}.`;
-  const commented = await paperclipFetch(input.env, `/api/issues/${input.issueId}/comments`, request, {
+  const commented = await paperclipFetch(input.env, `/api/issues/${encodeURIComponent(input.issueId)}/comments`, request, {
     method: "POST",
     body: JSON.stringify({ body }),
   });
   if (!commented.ok) return false;
-  const updated = await paperclipFetch(input.env, `/api/issues/${input.issueId}`, request, {
+  const updated = await paperclipFetch(input.env, `/api/issues/${encodeURIComponent(input.issueId)}`, request, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });

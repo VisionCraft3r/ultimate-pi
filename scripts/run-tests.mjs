@@ -8,10 +8,16 @@ import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const files = readdirSync("test")
-  .filter((name) => name.endsWith(".test.ts"))
-  .sort()
-  .map((name) => join("test", name));
+const files = [
+  ...readdirSync("test")
+    .filter((name) => name.endsWith(".test.ts"))
+    .sort()
+    .map((name) => join("test", name)),
+  ...readdirSync(join("paperclip", "test"))
+    .filter((name) => name.endsWith(".test.ts"))
+    .sort()
+    .map((name) => join("paperclip", "test", name)),
+];
 
 const major = Number(process.versions.node.split(".")[0]);
 const args = ["--experimental-strip-types", "--test"];

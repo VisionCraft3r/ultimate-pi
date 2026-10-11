@@ -53,6 +53,17 @@ The call returns without throwing, so the tmux child stays up. The child
 session file still holds the result. This file is independent of the activity
 patch.
 
+## `pi-interactive-subagents-global-model.patch`
+
+| | |
+| --- | --- |
+| Package | [`pi-interactive-subagents`](https://github.com/amosblomqvist/pi-interactive-subagents) **3.7.2** |
+| Target file | `pi-extension/subagents/index.ts` |
+| Pre-image SHA-256 | `4dd93c7f05b4c8ad0c97ad3fbd92d995678edfaf2fc79aa9e24884b880ba0eb9` |
+| Post-image SHA-256 | `b27026a706942d8d48deda125833ea53871ad56f72532908dcbbe697e9de9b57` |
+
+Applies to the installed checkout of `index.ts` (the stale-ctx post-image plus later local edits). On resume, `model` and `thinking` are read from the global `agents/<name>.md` profile when that file still exists. Tools, identity, cwd, and the spawn whitelist stay on the spawn snapshot. A missing profile keeps the snapshotted model. A running pane is left alone until it is resumed.
+
 ## `pi-graft-async-0.1.2.patch`
 
 | | |

@@ -70,6 +70,13 @@ test("pi-graft async patch is pinned to the published 0.1.2 preimage", () => {
   assert.equal(subagents.target, "pi-extension/subagents/index.ts");
   assert.equal(subagents.before, "0a438726c0a9e5bd02d0b87141b41238aae7c39ac2faa4f4a96eb0f5e1ecb1a4");
   assert.equal(subagents.after, "96dfdb1d722fcb6a478ccf919aae698b5f6f2fe6b770145aeca6acb21f711136");
+  const globalModel = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-interactive-subagents-global-model.patch");
+  assert.ok(globalModel);
+  assert.equal(globalModel.target, "pi-extension/subagents/index.ts");
+  assert.equal(globalModel.before, "4dd93c7f05b4c8ad0c97ad3fbd92d995678edfaf2fc79aa9e24884b880ba0eb9");
+  assert.equal(globalModel.after, "b27026a706942d8d48deda125833ea53871ad56f72532908dcbbe697e9de9b57");
+  assert.equal(subagents.supersededBy, globalModel.after);
+  assert.ok(DEPENDENCY_PATCHES.indexOf(globalModel) > DEPENDENCY_PATCHES.indexOf(subagents));
 });
 
 test("ready when target matches the before hash", async () => {

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { writeFileAtomic } from "../lib/atomic-write.ts";
 
 const MODELS_FILE = "models.json";
 
@@ -59,6 +60,6 @@ export async function mergeModelsJson(agentDir, providers, backupSession) {
 
   const next = { ...existing, providers: nextProviders };
   await fs.mkdir(agentDir, { recursive: true });
-  await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  await writeFileAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }

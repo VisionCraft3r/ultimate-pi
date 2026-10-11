@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Extension changes apply on `/reload`. The managed routing block and agent profiles update through `ultimate-pi setup agents`, not from a package update alone.
 
+### Security
+
+- **Audit fixes (B1-B2, M2-M8).** B1: `web_fetch` now refuses loopback, private, link-local, CGNAT, and multicast destinations at every redirect hop. B2: bash-guard treats `git clean --force`/short-flag clusters, newline-joined commands, and `|`/`|&`/`&`-separated pipeline stages as destructive. M2: the Jina reader fallback in `web_fetch`, which sends the target URL to a third party, only runs with `ULTIMATE_PI_WEB_FETCH_JINA=1`. M3: `findUltimatePiSource` drops the hardcoded personal checkout path in favor of `ULTIMATE_PI_ROOT`, an installer-recorded `sourceRoot`, or the package's own directory; the personal-string denylist and `.gitleaks.toml` are kept in sync with a word-boundary test. M4: `net-guard.ts` blocks RFC 1918/5737/6598/3927/4291 ranges and their IPv6 equivalents before every `web_fetch` connection. M5: npm updates found by `launch-update` are reported as notes and installed only when `ULTIMATE_PI_AUTO_UPDATE=1` is set. M6/M7: Paperclip API path segments are percent-encoded and config writes use atomic temp-file-then-rename. M8: the BMAD quick-update pins an exact, validated version and both it and `npm view` enforce a timeout instead of hanging indefinitely.
+
+### Fixed
+
+- **Local launch.** `@schultzp2020/pi-cursor` stays on 0.5.2. The 0.5.3 build cannot import `@earendil-works/pi-ai`, so loading the Cursor provider aborted startup and `cursor/grok-4.7` never registered. Install and settings merge rewrite an unpinned or other-version spec to `npm:@schultzp2020/pi-cursor@0.5.2`.
+- **Agent models after reload.** Resuming a subagent uses the `model` and `thinking` currently in the global `agents/<name>.md` profile. A running pane is left alone. Tools, identity, cwd, and the spawn whitelist stay on the snapshot from spawn. If that profile file is gone, resume keeps the snapshotted model.
+- **`web_fetch` in the agent directory.** The user-agent version is read from `package.json` when that file sits two directories up. A copied extension with no package file loads with `ultimate-pi/0.0.0` instead of throwing.
+
 ### Changed
 
 - **`web_search` uses Tavily.** Set `TAVILY_API_KEY`; the old Google environment variables are no longer read. Requests use bearer-authenticated POST, structured domain filters, bounded result counts, and explicit authentication/rate/usage-limit messages. The secret scanner recognizes Tavily keys.

@@ -11,6 +11,12 @@ const scanner = fileURLToPath(new URL("../scripts/scan-secrets.mjs", import.meta
 // Construct synthetic leak-shaped strings only at runtime, never as repo literals.
 const unknownHex = "a1".repeat(32);
 const tavilyKey = ["tv", "ly", "-", "synthetic_".repeat(4)].join("");
+const anthropicKey = ["sk", "-", "ant", "-", "synthetic_key_value_12345"].join("");
+const openaiProjectKey = ["sk", "-", "proj", "-", "synthetic_key_value_12345"].join("");
+const googleApiKey = ["AIza", "a".repeat(35)].join("");
+const githubToken = ["gh", "p", "_", "a".repeat(36)].join("");
+const slackToken = ["xox", "b", "-", "synthetic-token-value"].join("");
+const privateKeyHeader = ["-----BEGIN ", "PRIVATE KEY", "-----"].join("");
 
 async function inRepository(run: (dir: string) => Promise<void>) {
   const dir = await mkdtemp(join(tmpdir(), "upi-secret-scan-"));
@@ -42,7 +48,7 @@ test("scanner permits only the documented exact public image hashes", () => inRe
   const source = await readFile(scanner, "utf8");
   const allowed = [...source.matchAll(/publicHex\("([0-9a-f]+)", "([0-9a-f]+)"\)/g)]
     .map((match) => match[1] + match[2]);
-  assert.equal(allowed.length, 25); // Prior public image hashes, plus the graft settled-handler post-image and six observational-memory trigger images.
+  assert.equal(allowed.length, 28); // Prior public image hashes, plus the graft settled-handler post-image, six observational-memory trigger images, and the global-model resume patch.
   for (const descriptor of DEPENDENCY_PATCHES) {
     assert.ok(allowed.includes(descriptor.before));
     assert.ok(allowed.includes(descriptor.after));
@@ -67,6 +73,53 @@ test("synthetic Tavily keys fail and are masked", () => inRepository(async (dir)
   assert.equal(result.status, 1);
   assert.match(result.output, /Tavily key/);
   assert.equal(result.output.includes(tavilyKey), false);
+}));
+
+test("synthetic Anthropic keys fail and are masked", () => inRepository(async (dir) => {
+  await track(dir, anthropicKey);
+  const result = scan(dir);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /Anthropic key/);
+  assert.equal(result.output.includes(anthropicKey), false);
+}));
+
+test("synthetic OpenAI project keys fail and are masked", () => inRepository(async (dir) => {
+  await track(dir, openaiProjectKey);
+  const result = scan(dir);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /OpenAI project key/);
+  assert.equal(result.output.includes(openaiProjectKey), false);
+}));
+
+test("synthetic Google API keys fail and are masked", () => inRepository(async (dir) => {
+  await track(dir, googleApiKey);
+  const result = scan(dir);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /Google API key/);
+  assert.equal(result.output.includes(googleApiKey), false);
+}));
+
+test("synthetic GitHub tokens fail and are masked", () => inRepository(async (dir) => {
+  await track(dir, githubToken);
+  const result = scan(dir);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /GitHub token/);
+  assert.equal(result.output.includes(githubToken), false);
+}));
+
+test("synthetic Slack tokens fail and are masked", () => inRepository(async (dir) => {
+  await track(dir, slackToken);
+  const result = scan(dir);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /Slack token/);
+  assert.equal(result.output.includes(slackToken), false);
+}));
+
+test("a bare private key header fails", () => inRepository(async (dir) => {
+  await track(dir, privateKeyHeader);
+  const result = scan(dir);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /Private key header/);
 }));
 
 test("a public hash used as an assigned secret is not exempt", () => inRepository(async (dir) => {

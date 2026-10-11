@@ -4,6 +4,23 @@ Operational record of Pi CLI / extension updates applied to local installs. This
 is a run log, not a release changelog — see [CHANGELOG.md](../CHANGELOG.md) for
 package changes.
 
+## 2026-10-11 — Cursor provider pin and agent-model reload
+
+Scope: global `~/.pi/agent` install and the Ultimate PI checkout.
+
+### Applied
+
+- Reinstalled `@schultzp2020/pi-cursor@0.5.2` after `pi update` had floated the unpinned settings spec to `0.5.3`. That build imports `@earendil-works/pi-ai`, which is not resolvable from the agent npm tree, so a Cursor model aborted the turn and the provider never registered.
+- Settings spec is `npm:@schultzp2020/pi-cursor@0.5.2`. The idle and stale-context 0.5.2 patches were reapplied.
+- `web_fetch` no longer throws when the copied extension cannot see `../../package.json`.
+- Subagent resume reads `model` and `thinking` from `~/.pi/agent/agents/<name>.md` after `/reload`. The rest of the sandbox snapshot is unchanged.
+
+### Verification
+
+- Import of `pi-cursor/dist/index.js` succeeds.
+- `pi --list-models cursor/grok-4.7` lists the model.
+- A print-mode start in this checkout loaded extensions and reached the model request.
+
 ## 2026-10-08 — Pi CLI + extension update
 
 Scope: global `~/.pi/agent` install (shared by Ultimate PI and the local Pi

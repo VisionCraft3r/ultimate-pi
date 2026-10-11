@@ -13,6 +13,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -37,4 +39,5 @@ jobs:
         # Node 22 at one file at a time.
         run: npm test
       - run: npm run scan
+      - run: npm run check:pack
       - run: npm run smoke

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { listPersonas, parsePersonaMarkdown } from "../src/personas.ts";
 import { assertInScope, replaceModelLine, replaceThinkingLine, writeEnabledModels, writePersonaModel, writePersonaThinking, writeProviderFallback } from "../src/scope.ts";
-import { agentIdFromSession, buildPiArgs, paperclipChildEnv, parkedPaneTarget, parsePaneList, parseSessionList, parseSubagentScript, resolvePiBinary, sessionName, subagentNamesBySurface, tmuxNewSessionArgs } from "../src/launch.ts";
+import { spawnSync } from "node:child_process";
+import { agentIdFromSession, buildPiArgs, envFileText, paperclipChildEnv, parkedPaneTarget, parsePaneList, parseSessionList, parseSubagentScript, resolvePiBinary, sessionName, subagentNamesBySurface, tmuxNewSessionArgs } from "../src/launch.ts";
 import { deliverableSummary, extensionStartupError, parsePiJsonl } from "../src/parse.ts";
 import { orchestratorPersona } from "../src/personas.ts";
 import { chmodSync } from "node:fs";
@@ -90,13 +91,47 @@ test("tmux command uses the pi binary path so the shell function is not used", (
     cwd: "/work",
     piBinary: "/opt/homebrew/bin/pi",
     args: ["--mode", "json"],
-    env: { PI_CODING_AGENT_DIR: "/Users/me/.pi/agent" },
+    envFile: "/tmp/paperclip-run-abc/env.sh",
   });
   assert.equal(args[0], "new-session");
   assert.equal(args.includes("-d"), true);
   assert.match(args.at(-1) ?? "", /exec '\/opt\/homebrew\/bin\/pi'/);
+  assert.match(args.at(-1) ?? "", /^\. '\/tmp\/paperclip-run-abc\/env\.sh'; rm -f '\/tmp\/paperclip-run-abc\/env\.sh';/);
   assert.equal(parkedPaneTarget("paperclip-abc", ["%1", "%2"]), "%2");
   assert.equal(resolvePiBinary("/usr/bin:/opt/homebrew/bin").endsWith("pi") || resolvePiBinary("/usr/bin:/opt/homebrew/bin") === "pi", true);
+});
+
+test("envFileText rejects unsafe keys and round-trips shell-special values", () => {
+  assert.throws(() => envFileText({ "A;rm -rf /": "x" }), /invalid env key/);
+  assert.throws(() => envFileText({ "1A": "x" }), /invalid env key/);
+  assert.throws(() => envFileText({ "": "x" }), /invalid env key/);
+  const value = "a'b $(x)";
+  const text = envFileText({ K: value });
+  const result = spawnSync("sh", ["-c", `${text}printf %s "$K"`], { encoding: "utf8" });
+  assert.equal(result.stdout, value);
+});
+
+test("tmux argv never carries env values and paperclipChildEnv drops malformed keys", () => {
+  const env = { PAPERCLIP_API_KEY: "secret-token-value" };
+  const text = envFileText(env);
+  const args = tmuxNewSessionArgs({
+    session: "paperclip-abc",
+    cwd: "/work",
+    piBinary: "/opt/homebrew/bin/pi",
+    args: ["--mode", "json"],
+    envFile: "/tmp/paperclip-run-abc/env.sh",
+  });
+  assert.equal(args.some((arg) => arg.includes("secret-token-value")), false);
+  assert.match(text, /secret-token-value/);
+  const withExtra = paperclipChildEnv({
+    agentId: "agent-1",
+    companyId: "company-1",
+    runId: "run-1",
+    agentDir: "/tmp/agent",
+    context: {},
+    extraEnv: { "BAD KEY": "nope" },
+  });
+  assert.equal("BAD KEY" in withExtra, false);
 });
 
 test("persona model writes reject models outside the scoped list", () => {
@@ -116,6 +151,19 @@ test("persona model writes reject models outside the scoped list", () => {
   writePersonaThinking(dir, "scout", "xhigh");
   assert.match(readText(join(dir, "agents", "scout.md"), "utf8"), /thinking: xhigh/);
   assert.throws(() => writePersonaThinking(dir, "scout", "auto"), /thinking level/);
+});
+
+test("persona name is validated before touching persona files", () => {
+  assert.throws(() => writePersonaModel(dir, "../x", "cursor/a", ["cursor/a"]), /invalid persona name/);
+  assert.throws(() => writePersonaModel(dir, "a/b", "cursor/a", ["cursor/a"]), /invalid persona name/);
+  assert.throws(() => writePersonaThinking(dir, "../x", "high"), /invalid persona name/);
+  assert.throws(() => writePersonaThinking(dir, "a/b", "high"), /invalid persona name/);
+  mkdirSync(join(dir, "agents"), { recursive: true });
+  writeFileSync(join(dir, "settings.json"), `${JSON.stringify({ enabledModels: ["cursor/a"] }, null, 2)}\n`);
+  writeFileSync(join(dir, "agents", "qa_tester.md"), "---\nname: qa_tester\nmodel: cursor/a\n---\n");
+  writePersonaModel(dir, "qa_tester", "cursor/a", ["cursor/a"]);
+  writePersonaThinking(dir, "qa_tester", "high");
+  assert.match(readText(join(dir, "agents", "qa_tester.md"), "utf8"), /thinking: high/);
 });
 
 test("task workspace and instructions reach the run, and a harness cwd is the fallback", () => {
@@ -357,6 +405,34 @@ test("a finished run uses the Paperclip task and records a disposition", async (
   });
   assert.ok(calls.some((call) => call.startsWith("POST ") && call.includes("/comments")));
   assert.ok(calls.some((call) => call.startsWith("PATCH ")));
+});
+
+test("issueId and companyId are percent-encoded in API paths", async () => {
+  const calls: string[] = [];
+  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+    const path = String(url);
+    calls.push(`${init?.method ?? "GET"} ${path}`);
+    if (path.includes("/issues/a%2Fb%3Fc") && (init?.method ?? "GET") === "GET") return Response.json({ status: "in_progress" });
+    if (path.includes("/issues?")) return Response.json([]);
+    return Response.json({ status: "done" });
+  }) as typeof fetch;
+  await recordRunDisposition({
+    issueId: "a/b?c",
+    companyId: "co/1",
+    summary: "Encoded ids.",
+    fetchImpl,
+  });
+  assert.ok(calls.some((call) => call.includes("/issues/a%2Fb%3Fc")));
+  assert.ok(calls.some((call) => call.includes("/companies/co%2F1/issues")));
+  assert.equal(calls.some((call) => call.includes("/issues/a/b?c")), false);
+});
+
+test("writeEnabledModels leaves no .tmp- file behind", () => {
+  mkdirSync(join(dir, "agents"), { recursive: true });
+  writeFileSync(join(dir, "settings.json"), `${JSON.stringify({ enabledModels: [] }, null, 2)}\n`);
+  writeEnabledModels(dir, ["cursor/a"]);
+  const leftoverTmp = readdirSync(dir).filter((name) => name.includes(".tmp-"));
+  assert.deepEqual(leftoverTmp, []);
 });
 
 test("a failed disposition patch is not treated as recorded", async () => {

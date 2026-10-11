@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { writeFileAtomic } from "../lib/atomic-write.ts";
 import {
   modelForProviderFromAssignments,
   normalizeAgentFallbacks,
@@ -49,6 +50,6 @@ export async function writeModelConfig(
   };
 
   await fs.mkdir(agentDir, { recursive: true });
-  await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  await writeFileAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }

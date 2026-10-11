@@ -14,6 +14,13 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["extensions/**/*.ts", "lib/**/*.ts", "test/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "extensions/**/*.ts",
+    "lib/**/*.ts",
+    "test/**/*.ts",
+    "installer/**/*.mjs",
+    "paperclip/src/**/*.ts",
+    "paperclip/test/**/*.ts"
+  ],
+  "exclude": ["node_modules", "**/node_modules", "paperclip/dist", "paperclip/src/plugin/**"]
 }

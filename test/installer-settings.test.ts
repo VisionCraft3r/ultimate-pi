@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   mergeSettings,
+  pinCursorPackageSpec,
   applyAgentsMdBlock,
   applyPreferenceDefaults,
   applySettings,
@@ -31,6 +32,25 @@ test("mergeSettings preserves unrelated existing keys", async () => {
     assert.deepEqual(
       new Set(next.enabledModels),
       new Set(["anthropic/claude-x", "cursor/grok"]),
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("mergeSettings replaces an unpinned Cursor package with 0.5.2", async () => {
+  const dir = await makeTempDir();
+  try {
+    await writeFile(
+      path.join(dir, "settings.json"),
+      JSON.stringify({ packages: ["npm:@schultzp2020/pi-cursor", "npm:pi-lens"] }, null, 2),
+    );
+    await mergeSettings(dir, { packages: ["npm:@schultzp2020/pi-cursor@0.5.3"] });
+    const next = JSON.parse(await readFile(path.join(dir, "settings.json"), "utf8"));
+    assert.deepEqual(next.packages, ["npm:pi-lens", "npm:@schultzp2020/pi-cursor@0.5.2"]);
+    assert.deepEqual(
+      pinCursorPackageSpec(["npm:@gotgenes/pi-anthropic-auth"]),
+      ["npm:@gotgenes/pi-anthropic-auth"],
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

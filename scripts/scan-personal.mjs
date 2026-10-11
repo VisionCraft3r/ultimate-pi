@@ -3,12 +3,14 @@
  * Personal-string scanner. Run before every push alongside scan-secrets.mjs.
  * Scans the tracked working tree AND the full git history (`git log -p --all`)
  * for personal-identifying strings that shouldn't ship in a generic public
- * template: hardcoded personal home-dir paths, denylisted example names, and
- * denylisted company/product names.
+ * template: hardcoded personal home-dir paths and denylisted terms (DENY_TERMS,
+ * matched with word-boundary regexes to avoid false positives like "cursor
+ * provider"). DENY_TERMS is kept in sync with .gitleaks.toml by
+ * test/scan-personal.test.ts.
  *
- * These lists are intentionally maintainer-editable — add anything specific
- * to your own environment before publishing. Unlike scan-secrets.mjs, hits
- * here are NOT masked (there's nothing secret about a name, only something
+ * DENY_TERMS is intentionally maintainer-editable — add anything specific to
+ * your own environment before publishing. Unlike scan-secrets.mjs, hits here
+ * are NOT masked (there's nothing secret about a name, only something
  * personal), so the context snippet is printed as-is for easy triage.
  *
  * Exit 0 = clean. Exit 1 = at least one hit.
@@ -16,11 +18,26 @@
 
 import { execFileSync } from "node:child_process";
 
-/** Case-insensitive substring denylist for example/personal names. Extend as needed. */
-const NAME_DENYLIST = ["fatima", "midas al-furat"];
+/** Single denylist term set, enforced identically here and in .gitleaks.toml (kept in sync by test/scan-personal.test.ts). */
+export const DENY_TERMS = ["fatima", "midas", "al-furat", "macai", "godseye", "pc5d", "cursor pro", "ultimatepi"];
 
-/** Case-insensitive substring denylist for real company/product names that shouldn't be in a generic template. */
-const COMPANY_DENYLIST = [];
+/**
+ * Terms that already appear in published git history (outside this rule's own
+ * definition in scripts/scan-personal.mjs / .gitleaks.toml). Rewriting history
+ * is out of scope, so these are checked in the working tree only and skipped
+ * during the `git log -p --all` scan. `ultimatepi` hits because older commits
+ * reference a `Documents/UltimatePI/ultimate-pi` path that predates the
+ * source-root lookup fix.
+ */
+export const TREE_ONLY_TERMS = ["ultimatepi"];
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function denyTermPattern(term) {
+  return new RegExp("\\b" + escapeRegExp(term) + "\\b", "i");
+}
 
 /** Path fragments that indicate a hardcoded personal home directory rather than a generic placeholder.
  *  Additive to NAME_DENYLIST: flags ANY committer's macOS `/Users/<name>/` or Linux `/home/<name>/` path. */
@@ -60,21 +77,16 @@ function contextSnippet(line, maxLen = 160) {
   return trimmed.length > maxLen ? `${trimmed.slice(0, maxLen)}…` : trimmed;
 }
 
-function scanText(label, text, hits) {
+function scanText(label, text, hits, { skipTerms = [] } = {}) {
   const lines = text.split("\n");
+  const skip = new Set(skipTerms);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const lower = line.toLowerCase();
 
-    for (const name of NAME_DENYLIST) {
-      if (name && lower.includes(name.toLowerCase())) {
-        hits.push({ label, lineNo: i + 1, kind: `denylisted name "${name}"`, snippet: contextSnippet(line) });
-      }
-    }
-
-    for (const company of COMPANY_DENYLIST) {
-      if (company && lower.includes(company.toLowerCase())) {
-        hits.push({ label, lineNo: i + 1, kind: `denylisted company/product "${company}"`, snippet: contextSnippet(line) });
+    for (const term of DENY_TERMS) {
+      if (skip.has(term)) continue;
+      if (denyTermPattern(term).test(line)) {
+        hits.push({ label, lineNo: i + 1, kind: `denylisted term "${term}"`, snippet: contextSnippet(line) });
       }
     }
 
@@ -120,7 +132,7 @@ function scanGitHistory(hits) {
   const flush = () => {
     if (buffer.length === 0) return;
     if (!currentFile || !SELF_EXEMPT_FILES.has(currentFile)) {
-      scanText("git history (log -p --all)", buffer.join("\n"), hits);
+      scanText("git history (log -p --all)", buffer.join("\n"), hits, { skipTerms: TREE_ONLY_TERMS });
     }
     buffer = [];
   };
@@ -154,7 +166,9 @@ async function main() {
   process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(`✖ scan-personal: scan could not complete: ${error.message}`);
-  process.exitCode = 1;
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error(`✖ scan-personal: scan could not complete: ${error.message}`);
+    process.exitCode = 1;
+  });
+}

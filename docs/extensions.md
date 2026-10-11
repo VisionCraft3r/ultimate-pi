@@ -28,7 +28,7 @@ Caps `scout` at 20 tool rounds. A round is one assistant message that contains t
 
 ### `agent-config`
 
-`/agents` lists every `agents/*.md` profile (managed roles and any extra profile such as `video-ads`; `*.ultimate-pi.md` sidecars are skipped) with its `model:` and `thinking:`. Pick one to change the model, the thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`), or both. `/agents list` prints the same table. `/agents <name> model <provider/id>` and `/agents <name> thinking <level>` skip the menus. Scoped models are listed first. A model missing from the registry, or a thinking level above `off` on a model that does not reason, is saved and called out. The write updates that profile and, when the name is in the managed table, the cell inside the `<!-- ultimate-pi:begin/end -->` block. It applies the next time that agent is spawned. A running pane is left alone. The command does nothing in a subagent session.
+`/agents` lists every `agents/*.md` profile (managed roles and any extra profile such as `video-ads`; `*.ultimate-pi.md` sidecars are skipped) with its `model:` and `thinking:`. Pick one to change the model, the thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`), or both. `/agents list` prints the same table. `/agents <name> model <provider/id>` and `/agents <name> thinking <level>` skip the menus. Scoped models are listed first. A model missing from the registry, or a thinking level above `off` on a model that does not reason, is saved and called out. The write updates that profile and, when the name is in the managed table, the cell inside the `<!-- ultimate-pi:begin/end -->` block. It applies the next time that agent is spawned. A running pane is left alone. After `/reload`, resuming that agent uses the `model` and `thinking` currently in the global `agents/<name>.md` profile; the spawn snapshot still supplies tools, identity, cwd, and the spawn whitelist. If that profile file is gone, resume keeps the snapshotted model. The command does nothing in a subagent session.
 
 ### `model-agents`
 
@@ -54,7 +54,7 @@ The floor lives in `extensions/bash-guard/rules.ts` with a justification, a safe
 
 ### `launch-update`
 
-On session start, after the prompt is up, applies patch and minor npm updates that stay on known pins. Version checks run four at a time. Installs stay one at a time. Major bumps, and packages pinned to a patch (`@schultzp2020/pi-cursor`), are left in place. It also copies `extensions`, `lib`, `templates`, `skills`, and `patches` from a checkout named by `ULTIMATE_PI_ROOT` only after that checkout's tests pass. Extension files that do not export a factory are not copied. The extension does not assume a home-directory path.
+On session start, after the prompt is up, applies patch and minor npm updates that stay on known pins. Version checks run four at a time. Installs stay one at a time. Major bumps, and packages pinned to a patch (`@schultzp2020/pi-cursor`), are left in place. An update that is ready to apply is reported as a note (`update available: ... set ULTIMATE_PI_AUTO_UPDATE=1 to install`) unless `ULTIMATE_PI_AUTO_UPDATE=1` is set, in which case it installs. It also copies `extensions`, `lib`, `templates`, `skills`, and `patches` from a source checkout only after that checkout's tests pass. `findUltimatePiSource` looks, in order, at `ULTIMATE_PI_ROOT`, the `sourceRoot` that `ultimate-pi install` recorded in `<agentDir>/ultimate-pi-launch.json` when run from a git checkout (`installer/launch-state.mjs`), then this package's own install directory. Extension files that do not export a factory are not copied. The extension does not assume a home-directory path.
 
 ### `wave-diff`
 
@@ -78,7 +78,7 @@ Set `ULTIMATE_PI_TRACE=1`, or `"ultimatePiTrace": true` in `<agentDir>/settings.
 
 ### `web-fetch`
 
-`web_fetch` turns an HTTP response into markdown or plain text (HTML and PDF). The HTML and PDF converters load on the first conversion, not at startup. Does not store credentials in the repo.
+`web_fetch` turns an HTTP response into markdown or plain text (HTML and PDF). The HTML and PDF converters load on the first conversion, not at startup. Does not store credentials in the repo. It refuses loopback, private, link-local, CGNAT, and multicast addresses, including after redirects (it follows up to 5 hops). The `r.jina.ai` reader fallback, which sends the target URL to a third party, only runs when `ULTIMATE_PI_WEB_FETCH_JINA=1` is set.
 
 ### `web-search`
 

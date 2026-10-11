@@ -132,7 +132,7 @@ test("doctor accepts a relative local package spec, matching how `pi install <pa
   const agentDir = await mkdtemp(path.join(tmpdir(), "ultimate-pi-doctor-relative-"));
   try {
     // `pi install <path>` records the spec relative to agentDir, not as an
-    // absolute path — e.g. "../../Documents/UltimatePI/ultimate-pi". Doctor
+    // absolute path — e.g. "../../code/ultimate-pi". Doctor
     // must resolve that the same way pi does, not just handle absolute paths.
     const outsideRoot = await mkdtemp(path.join(tmpdir(), "ultimate-pi-relative-target-"));
     try {

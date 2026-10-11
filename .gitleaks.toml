@@ -15,7 +15,7 @@ useDefault = true
 [[rules]]
 id = "ultimate-pi-personal-strings"
 description = "Personal/dev-machine strings that must never appear in this repo"
-regex = '''(?i)(MacAI|/Users/[a-zA-Z]|/home/[a-z]|fatima|midas|al-furat|UltimatePI|GodsEye|PC5D|Cursor Pro)'''
+regex = '''(?i)(\b(?:fatima|midas|al-furat|macai|godseye|pc5d|cursor pro|ultimatepi)\b|/Users/[a-zA-Z]|/home/[a-z])'''
 tags = ["personal-data", "ultimate-pi"]
 
 # Path-dependent macOS-extra exceptions cannot be expressed with Go's RE2

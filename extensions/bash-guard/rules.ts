@@ -225,12 +225,12 @@ export const FLOOR_RULES: FloorRule[] = [
 	},
 	{
 		id: "git-clean",
-		pattern: /\bgit\s+clean\b[^#\n]*-[a-zA-Z]*f/,
+		pattern: /\bgit\s+clean\b[^#\n]*(?:-[a-zA-Z]*f[a-zA-Z]*\b|--force\b)/,
 		reason: "delete untracked files (git clean -f)",
 		justification: "git clean -f deletes untracked files.",
 		alternative: "Use git clean -n to preview, then delete named files.",
 		mainFloor: true,
-		match: ["git clean -fd"],
+		match: ["git clean -fd", "git clean --force -d"],
 		notMatch: ["git clean -n"],
 	},
 	{

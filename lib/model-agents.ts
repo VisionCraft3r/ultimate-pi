@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getAgentDir } from "./agent-dir.ts";
+import { writeFileAtomicSync } from "./atomic-write.ts";
 
 function inAgent(name: string): string {
   return join(getAgentDir(), name);
@@ -265,7 +266,7 @@ export function appendEnabledModel(modelRef: string, root = getAgentDir()): bool
       ...list.filter((entry): entry is string => typeof entry === "string"),
       modelRef,
     ];
-    writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+    writeFileAtomicSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
     return true;
   }
   writeFileSync(settingsPath, next);

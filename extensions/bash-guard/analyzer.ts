@@ -151,7 +151,12 @@ function analyzeSegment(seg: Token[]): Risk | null {
 			severity = "high";
 			reasons.push("git rm (deletes files from working tree and stages deletions)");
 		}
-		if (sub === "clean" && (subArgs.some((a) => a.includes("-f")) || subArgs.includes("-d") || subArgs.includes("-x"))) {
+		if (
+			sub === "clean" &&
+			(subArgs.some((a) => a === "--force" || (/^-[a-zA-Z]+$/.test(a) && a.includes("f"))) ||
+				subArgs.includes("-d") ||
+				subArgs.includes("-x"))
+		) {
 			severity = "high";
 			reasons.push("git clean (can delete untracked files)");
 		}
@@ -316,7 +321,35 @@ function analyzeSegment(seg: Token[]): Risk | null {
 	return { severity, reasons };
 }
 
-export function analyzeBashCommand(command: string): Risk | null {
+/** Split a command on unquoted newlines so multi-line scripts are analyzed line by line. */
+function splitOnUnquotedNewlines(command: string): string[] {
+	const lines: string[] = [];
+	let current = "";
+	let quote: '"' | "'" | null = null;
+	for (let i = 0; i < command.length; i++) {
+		const ch = command[i];
+		if (quote) {
+			current += ch;
+			if (ch === quote && command[i - 1] !== "\\") quote = null;
+			continue;
+		}
+		if (ch === '"' || ch === "'") {
+			quote = ch;
+			current += ch;
+			continue;
+		}
+		if (ch === "\n") {
+			lines.push(current);
+			current = "";
+			continue;
+		}
+		current += ch;
+	}
+	lines.push(current);
+	return lines.filter((l) => l.trim().length > 0);
+}
+
+function analyzeLine(command: string): Risk | null {
 	let tokens: Token[];
 	try {
 		tokens = shellParse(command) as Token[];
@@ -341,8 +374,8 @@ export function analyzeBashCommand(command: string): Risk | null {
 		reasons.push("pipe operator (chained commands)");
 	}
 
-	// Segment analysis (split on &&, ||, ;)
-	const segments = splitOnOps(tokens, ["&&", "||", ";"]);
+	// Segment analysis (split on &&, ||, ;, |, |&, & — each pipeline stage is its own segment)
+	const segments = splitOnOps(tokens, ["&&", "||", ";", "|", "|&", "&"]);
 	for (const seg of segments) {
 		const segRisk = analyzeSegment(seg);
 		if (!segRisk) continue;
@@ -353,5 +386,22 @@ export function analyzeBashCommand(command: string): Risk | null {
 	// De-duplicate reasons
 	const uniq = [...new Set(reasons)];
 	if (uniq.length === 0) return null;
+	return { severity, reasons: uniq };
+}
+
+export function analyzeBashCommand(command: string): Risk | null {
+	const lines = splitOnUnquotedNewlines(command);
+	const reasons: string[] = [];
+	let severity: Severity = "medium";
+	let found = false;
+	for (const line of lines) {
+		const risk = analyzeLine(line);
+		if (!risk) continue;
+		found = true;
+		if (risk.severity === "high") severity = "high";
+		for (const r of risk.reasons) reasons.push(r);
+	}
+	if (!found) return null;
+	const uniq = [...new Set(reasons)];
 	return { severity, reasons: uniq };
 }

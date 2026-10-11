@@ -11,6 +11,7 @@ import { configureWebSearchKey } from "./web-search-key.mjs";
 import { mergeCredentials, readAuth } from "./auth-store.mjs";
 import { mergeModelsJson } from "./models-json.mjs";
 import { applySettings } from "./settings.mjs";
+import { recordSourceRoot } from "./launch-state.mjs";
 import { applyEnabledExtras, configureExtras } from "./extras.mjs";
 import { doctor } from "./doctor.mjs";
 import { runBashCheck } from "./bash-check.mjs";
@@ -105,6 +106,7 @@ export async function install(rawOptions) {
     extras: { enabledExtras },
   };
   await applySettings(options, allAnswers);
+  if (!options.dryRun) await recordSourceRoot(options.agentDir, REPO_ROOT);
 
   log(options, "");
   log(options, `JEV: ${jev?.mode === "openrouter" ? "configured (OpenRouter)" : "heuristic fallback mode"}`);

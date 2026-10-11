@@ -9,6 +9,11 @@
 import { execFileSync } from "node:child_process";
 
 const PATTERNS = [
+  { name: "Anthropic key", re: /sk-ant-[A-Za-z0-9_-]{20,}/g },
+  { name: "OpenAI project key", re: /sk-proj-[A-Za-z0-9_-]{20,}/g },
+  { name: "Google API key", re: /AIza[0-9A-Za-z_-]{35}/g },
+  { name: "GitHub token", re: /gh[pousr]_[A-Za-z0-9]{36,}/g },
+  { name: "Slack token", re: /xox[abprs]-[A-Za-z0-9-]{10,}/g },
   { name: "OpenAI-style key", re: /sk-[a-zA-Z0-9]{20,}/g },
   { name: "OpenRouter key", re: /sk-or-[a-zA-Z0-9-]{10,}/g },
   { name: "Tavily key", re: /tvly-[A-Za-z0-9_-]{16,}/g },
@@ -54,12 +59,18 @@ const ALLOWED_BARE_HEX = new Set([
   publicHex("2266f5a7a8e82aa9c358", "ec39a7dd53420ebf38f1"),
   publicHex("0a438726c0a9e5bd02d0b87141b41238", "aae7c39ac2faa4f4a96eb0f5e1ecb1a4"),
   publicHex("96dfdb1d722fcb6a478ccf919aae698b5", "f6f2fe6b770145aeca6acb21f711136"),
+  // Local pi-interactive-subagents index.ts before/after
+  // pi-interactive-subagents-global-model.patch (SHA-256).
+  publicHex("4dd93c7f05b4c8ad0c97ad3fbd92d995", "678edfaf2fc79aa9e24884b880ba0eb9"),
+  publicHex("b27026a706942d8d48deda125833ea53", "871ad56f72532908dcbbe697e9de9b57"),
   // pi-graft settled-handler stale-ctx post-image, and observational-memory
   // 0.1.0 observer/consolidator/compaction trigger before/after images.
   publicHex("e3f2684791d8d44fc909d84a887f5899", "6001307be71bb3fdb10fbead5dfc6bdb"),
   publicHex("0bfe292de9bfd3e95a48e7499f98401d", "69a07b4e4f77602f9cc27945fbd87db9"),
   publicHex("f45758d173508b0384447d790531d401", "e29374e78b5472287f081eb67a24f8c0"),
   publicHex("4594cd243c4a5aff2e11e057dd4b0431", "fd76fc1e6506c0695e57a7bc1229e121"),
+  // observational-memory 0.1.0 upstream commit SHA (patches/README.md provenance table).
+  publicHex("78a1efcfdd46332253fb", "289724f05b26dfc7769e"),
   publicHex("766634f8364569369ef7d78012363a7a", "a84ac679620b8f6db9436f6dee7dd061"),
   publicHex("6d3e7abc671d8ed6d0c3706d3d74f027", "7e541038e35d03fadc11b2210edcf2d0"),
   publicHex("cb757631b32a76f4a49fe6c11d2bde41", "bcd6d3bd172a7857bdc5c7ca0d1f2bc7"),

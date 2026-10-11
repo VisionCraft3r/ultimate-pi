@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { definePlugin, runWorker } from "@paperclipai/plugin-sdk";
@@ -9,7 +9,7 @@ import { beginFolderPick, prepareProjectFolder, readFolderPick } from "../projec
 import { applyPaperclipUiPatches } from "../../scripts/patch-paperclip-ui.mjs";
 import { listPersonas, personaByName } from "../personas.ts";
 import { piSkillDeclarations } from "../pi-skills.ts";
-import { isThinkingLevel, readEnabledModels, readFallbacks, writeEnabledModels, writePersonaModel, writePersonaThinking, writeProviderFallback } from "../scope.ts";
+import { isThinkingLevel, readEnabledModels, readFallbacks, writeEnabledModels, writeFileAtomic, writePersonaModel, writePersonaThinking, writeProviderFallback } from "../scope.ts";
 import { isMirrorDescription, mirrorShownBesidePane } from "../../../lib/paperclip-mirror.ts";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -89,13 +89,13 @@ async function runningCompanyInfo(companyId: string): Promise<{ agents: RunningA
   let agents: RunningAgent[] = [];
   let mirrors: RunningIssue[] = [];
   try {
-    const listed = await paperclip("GET", `/companies/${companyId}/agents`) as RunningAgent[] | { agents?: RunningAgent[] };
+    const listed = await paperclip("GET", `/companies/${encodeURIComponent(companyId)}/agents`) as RunningAgent[] | { agents?: RunningAgent[] };
     agents = Array.isArray(listed) ? listed : listed.agents ?? [];
   } catch {
     agents = [];
   }
   try {
-    const listed = await paperclip("GET", `/companies/${companyId}/issues?status=in_progress,todo,blocked,in_review`) as RunningIssue[] | { issues?: RunningIssue[] };
+    const listed = await paperclip("GET", `/companies/${encodeURIComponent(companyId)}/issues?status=in_progress,todo,blocked,in_review`) as RunningIssue[] | { issues?: RunningIssue[] };
     const issues = Array.isArray(listed) ? listed : listed.issues ?? [];
     mirrors = issues.filter((issue) => isMirrorDescription(issue.description ?? "") && issue.status !== "done" && issue.status !== "cancelled");
   } catch {
@@ -145,7 +145,7 @@ function writeSeedFile(companyId: string, state: OrgSeedState): void {
   }
   all[companyId] = state;
   mkdirSync(agentDir(), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(all, null, 2)}\n`);
+  writeFileAtomic(path, `${JSON.stringify(all, null, 2)}\n`);
 }
 
 async function syncCompany(companyId: string, ctx: SyncContext, options?: { force?: boolean }): Promise<void> {
@@ -372,24 +372,24 @@ const plugin = definePlugin({
       const issueId = typeof event.entityId === "string" ? event.entityId : "";
       const companyId = typeof event.companyId === "string" ? event.companyId : "";
       if (!issueId || !companyId) return;
-      const issue = await paperclip("GET", `/issues/${issueId}`) as {
+      const issue = await paperclip("GET", `/issues/${encodeURIComponent(issueId)}`) as {
         assigneeAgentId?: string | null;
         status?: string;
         description?: string | null;
       };
       if (isMirrorDescription(issue.description ?? "")) {
         if (issue.assigneeAgentId || issue.status === "in_progress") {
-          await paperclip("PATCH", `/issues/${issueId}`, { status: "todo", assigneeAgentId: null });
+          await paperclip("PATCH", `/issues/${encodeURIComponent(issueId)}`, { status: "todo", assigneeAgentId: null });
         }
         return;
       }
       if (issue.assigneeAgentId) return;
       if (!issue.status || issue.status === "backlog" || issue.status === "done" || issue.status === "cancelled") return;
-      const listed = await paperclip("GET", `/companies/${companyId}/agents`) as Array<{ id?: string; status?: string; adapterConfig?: { persona?: string } }> | { agents?: Array<{ id?: string; status?: string; adapterConfig?: { persona?: string } }> };
+      const listed = await paperclip("GET", `/companies/${encodeURIComponent(companyId)}/agents`) as Array<{ id?: string; status?: string; adapterConfig?: { persona?: string } }> | { agents?: Array<{ id?: string; status?: string; adapterConfig?: { persona?: string } }> };
       const agents = Array.isArray(listed) ? listed : listed.agents ?? [];
       const orchestrator = agents.find((agent) => agent.status !== "terminated" && agent.adapterConfig?.persona === "orchestrator" && agent.id);
       if (!orchestrator?.id) return;
-      await paperclip("PATCH", `/issues/${issueId}`, { assigneeAgentId: orchestrator.id });
+      await paperclip("PATCH", `/issues/${encodeURIComponent(issueId)}`, { assigneeAgentId: orchestrator.id });
     });
 
     const deliver = async (payload: unknown) => {

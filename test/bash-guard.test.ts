@@ -103,6 +103,24 @@ test("interactive analyzer flags risky git subcommands", () => {
 	assert.match(clean?.reasons.join(" ") ?? "", /git clean/);
 });
 
+test("interactive analyzer flags git clean --force", () => {
+	const force = analyzeBashCommand("git clean --force");
+	assert.equal(force?.severity, "high");
+	assert.match(force?.reasons.join(" ") ?? "", /git clean/);
+});
+
+test("interactive analyzer flags destructive commands on a later unquoted line", () => {
+	const result = analyzeBashCommand("echo hi\nrm -rf /tmp/x");
+	assert.equal(result?.severity, "high");
+	assert.match(result?.reasons.join(" ") ?? "", /recursive delete/);
+});
+
+test("interactive analyzer flags each pipeline stage, including rm after a pipe", () => {
+	const result = analyzeBashCommand("cat f | rm -rf x");
+	assert.equal(result?.severity, "high");
+	assert.match(result?.reasons.join(" ") ?? "", /rm \(file deletion\)/);
+});
+
 test("interactive analyzer flags interpreter -c/-e snippets with destructive commands", () => {
 	const py = analyzeBashCommand(`python -c "import os; os.system('rm -rf /tmp/x')"`);
 	assert.equal(py?.severity, "high");

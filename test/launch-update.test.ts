@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyNpmUpdate, copySource, copySourceIfIdle, gitCheckoutDir, isSubagentSession, mapWithCap, nonNpmPackageNote, npmCheckDue, npmPackageName, parsePiVersion, plannotatorExtensionIndex, plannotatorUpdateAllowed, reapplyPlannotatorCreateGuard, SUBAGENT_SYNC_DEFER, versionAtLeast } from "../lib/launch-update.ts";
+import { autoUpdateEnabled, classifyNpmUpdate, copySource, copySourceIfIdle, findUltimatePiSource, gitCheckoutDir, isSubagentSession, mapWithCap, nonNpmPackageNote, npmCheckDue, npmPackageName, parsePiVersion, plannotatorExtensionIndex, plannotatorUpdateAllowed, reapplyPlannotatorCreateGuard, SUBAGENT_SYNC_DEFER, versionAtLeast } from "../lib/launch-update.ts";
 import { copyExtensionTree, isExtensionFactorySource, unsafeExtensionEntries } from "../lib/extension-layout.ts";
 import { formatAnswers, formatSidecarQuestion, paperclipEnv, parseSubagentQuestion, questionsFromAsk } from "../lib/paperclip-questions.ts";
 import { writeAskSidecar } from "../lib/planner-handoff.ts";
@@ -216,4 +216,51 @@ test("a subagent without Paperclip env parks the question in the ask sidecar", (
     else process.env.PAPERCLIP_TASK_ID = previous.task;
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("findUltimatePiSource checks env, then recorded sourceRoot, then falls back to its own package dir", () => {
+  const root = mkdtempSync(join(tmpdir(), "ultimate-pi-source-"));
+  try {
+    const envRoot = join(root, "env-checkout");
+    mkdirSync(envRoot, { recursive: true });
+    writeFileSync(join(envRoot, "package.json"), JSON.stringify({ name: "ultimate-pi" }));
+
+    const recordedRoot = join(root, "recorded-checkout");
+    mkdirSync(recordedRoot, { recursive: true });
+    writeFileSync(join(recordedRoot, "package.json"), JSON.stringify({ name: "ultimate-pi" }));
+
+    const agentDir = join(root, "agent");
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, "ultimate-pi-launch.json"), JSON.stringify({ sourceRoot: recordedRoot, hash: "keep-me" }));
+
+    // env wins over everything else.
+    assert.equal(findUltimatePiSource({ env: { ULTIMATE_PI_ROOT: envRoot } as NodeJS.ProcessEnv, agentDir }), envRoot);
+
+    // No env: the recorded sourceRoot wins.
+    assert.equal(findUltimatePiSource({ env: {} as NodeJS.ProcessEnv, agentDir }), recordedRoot);
+
+    // Recorded sourceRoot whose package.json name is wrong falls through to this package's own dir.
+    const wrongNameRoot = join(root, "wrong-name-checkout");
+    mkdirSync(wrongNameRoot, { recursive: true });
+    writeFileSync(join(wrongNameRoot, "package.json"), JSON.stringify({ name: "not-ultimate-pi" }));
+    const badAgentDir = join(root, "agent-bad");
+    mkdirSync(badAgentDir, { recursive: true });
+    writeFileSync(join(badAgentDir, "ultimate-pi-launch.json"), JSON.stringify({ sourceRoot: wrongNameRoot }));
+    const ownDir = findUltimatePiSource({ env: {} as NodeJS.ProcessEnv, agentDir: badAgentDir });
+    assert.notEqual(ownDir, wrongNameRoot);
+    assert.ok(ownDir && ownDir.endsWith("ultimate-pi"));
+
+    // No recorded state at all also falls through to this package's own dir.
+    const emptyAgentDir = join(root, "agent-empty");
+    mkdirSync(emptyAgentDir, { recursive: true });
+    assert.equal(findUltimatePiSource({ env: {} as NodeJS.ProcessEnv, agentDir: emptyAgentDir }), ownDir);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("autoUpdateEnabled is true only for ULTIMATE_PI_AUTO_UPDATE=1", () => {
+  assert.equal(autoUpdateEnabled({ ULTIMATE_PI_AUTO_UPDATE: "1" } as NodeJS.ProcessEnv), true);
+  assert.equal(autoUpdateEnabled({ ULTIMATE_PI_AUTO_UPDATE: "true" } as NodeJS.ProcessEnv), false);
+  assert.equal(autoUpdateEnabled({} as NodeJS.ProcessEnv), false);
 });

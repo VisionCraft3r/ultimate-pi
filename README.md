@@ -305,12 +305,22 @@ recorded pid and its children), `/context` (parent session), `/browser`,
 `/snippets`, `/builtin-header`, and `/cache` / `/om` if those optional
 packages are installed.
 
-After the prompt is up, `launch-update` applies patch and minor npm updates
-that stay on known pins, and copies a newer checkout from `ULTIMATE_PI_ROOT`
-only after that checkout's tests pass. Version checks run four at a time.
-Installs stay one at a time. Major bumps stay put. Playwright and the HTML/PDF
-converters load on first use, not at startup. The daily Cursor catalog scan
-does not hold the prompt. `/ModelAgents` "Scan now" still waits for it.
+After the prompt is up, `launch-update` looks for an Ultimate Pi checkout to
+sync, in order: `ULTIMATE_PI_ROOT`, the `sourceRoot` that `ultimate-pi
+install` recorded in `<agentDir>/ultimate-pi-launch.json` when it ran from a
+git checkout, then this package's own install directory. It copies the
+checkout into the agent dir only after that checkout's tests pass. Patch and
+minor npm updates that stay on known pins are reported as notes by default;
+set `ULTIMATE_PI_AUTO_UPDATE=1` to actually install them. Version checks run
+four at a time. Installs stay one at a time. Major bumps stay put. Playwright
+and the HTML/PDF converters load on first use, not at startup. The daily
+Cursor catalog scan does not hold the prompt. `/ModelAgents` "Scan now" still
+waits for it.
+
+The `web_fetch` tool refuses to fetch loopback, private, link-local, CGNAT,
+and multicast addresses, including after redirects (it follows up to 5). The
+`r.jina.ai` reader fallback, which sends the target URL to a third party, only
+runs when `ULTIMATE_PI_WEB_FETCH_JINA=1` is set.
 
 ## Security & privacy
 

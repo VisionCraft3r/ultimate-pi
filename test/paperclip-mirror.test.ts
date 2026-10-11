@@ -75,3 +75,30 @@ test("a subagent tool result becomes a child issue and the result closes it", as
   assert.equal((comment?.body as { body: string }).body, "Login form builds.");
   assert.equal((patch?.body as { status: string }).status, "done");
 });
+
+test("issueId and taskId are percent-encoded in API paths", async () => {
+  const trickyEnv: MirrorEnv = { ...env, taskId: "a/b?c" };
+  const calls: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    calls.push(String(input));
+    return Response.json([]);
+  };
+  await createMirrorIssue({ env: trickyEnv, launch: { agent: "worker", name: "x", task: "y" }, fetchImpl });
+  assert.ok(calls.some((url) => url.includes("/issues?parentId=a%2Fb%3Fc")));
+  assert.equal(calls.some((url) => url.includes("parentId=a/b?c")), false);
+
+  const closeCalls: string[] = [];
+  const closeFetchImpl: typeof fetch = async (input) => {
+    closeCalls.push(String(input));
+    return Response.json({ ok: true });
+  };
+  await closeMirrorIssue({
+    env,
+    issueId: "a/b?c",
+    close: { name: "x", exitCode: 0, content: "done" },
+    fetchImpl: closeFetchImpl,
+  });
+  assert.ok(closeCalls.some((url) => url.endsWith("/issues/a%2Fb%3Fc/comments")));
+  assert.ok(closeCalls.some((url) => url.endsWith("/issues/a%2Fb%3Fc")));
+  assert.equal(closeCalls.some((url) => url.includes("/issues/a/b?c")), false);
+});

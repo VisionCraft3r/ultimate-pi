@@ -6,6 +6,12 @@ import { join } from "node:path";
 import type { PersonaFrontmatter } from "./personas.ts";
 import { splitModelRef } from "./scope.ts";
 
+export const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function isValidEnvKey(key: string): boolean {
+  return ENV_KEY_RE.test(key);
+}
+
 export function paperclipChildEnv(input: {
   agentId: string;
   companyId: string;
@@ -22,7 +28,7 @@ export function paperclipChildEnv(input: {
   const apiUrl = process.env.PAPERCLIP_API_URL ?? `http://${host}:${port}`;
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(input.extraEnv ?? {})) {
-    if (!key || key === "PAPERCLIP_PI_PROVIDERS") continue;
+    if (!key || key === "PAPERCLIP_PI_PROVIDERS" || !isValidEnvKey(key)) continue;
     env[key] = value;
   }
   Object.assign(env, {
@@ -80,19 +86,25 @@ export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+export function envFileText(env: Record<string, string>): string {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(env)) {
+    if (!isValidEnvKey(key)) throw new Error(`invalid env key: ${key}`);
+    lines.push(`export ${key}=${shellQuote(value)}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 /** Detached tmux session whose main process is the real pi binary, so TMUX is set. */
 export function tmuxNewSessionArgs(input: {
   session: string;
   cwd: string;
   piBinary: string;
   args: readonly string[];
-  env: Record<string, string>;
+  envFile: string;
 }): string[] {
-  const exports = Object.entries(input.env)
-    .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
-    .join("; ");
   const pi = [shellQuote(input.piBinary), ...input.args.map(shellQuote)].join(" ");
-  const inner = `${exports}; cd ${shellQuote(input.cwd)}; exec ${pi}`;
+  const inner = `. ${shellQuote(input.envFile)}; rm -f ${shellQuote(input.envFile)}; cd ${shellQuote(input.cwd)}; exec ${pi}`;
   return ["new-session", "-d", "-s", input.session, "-c", input.cwd, inner];
 }
 

@@ -1,8 +1,11 @@
 /**
- * Launch-time updater. Applies patch/minor npm updates that stay on known-good
- * pins, and copies a newer Ultimate PI checkout into the agent dir only after
- * its tests pass. Major bumps and patched packages that would leave their pin
- * are left in place.
+ * Launch-time updater. Finds the Ultimate PI checkout via `ULTIMATE_PI_ROOT`,
+ * a `sourceRoot` recorded by the installer in `ultimate-pi-launch.json`, or
+ * this package's own directory, and copies it into the agent dir only after
+ * its tests pass. Patch/minor npm updates that stay on known-good pins are
+ * reported as notes unless `ULTIMATE_PI_AUTO_UPDATE=1`, which installs them.
+ * Major bumps and patched packages that would leave their pin are left in
+ * place.
  */
 
 import { spawn } from "node:child_process";
@@ -11,6 +14,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unl
 import { homedir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { writeFileAtomicSync } from "./atomic-write.ts";
 import { copyExtensionTree } from "./extension-layout.ts";
 
 const PATCH_PINS: Record<string, string> = {
@@ -263,11 +267,12 @@ function lockHolderAlive(lockPath: string): boolean {
   }
 }
 
-export function findUltimatePiSource(): string | null {
-  const fromEnv = process.env.ULTIMATE_PI_ROOT?.trim();
+export function findUltimatePiSource(opts: { env?: NodeJS.ProcessEnv; agentDir?: string } = {}): string | null {
+  const env = opts.env ?? process.env;
+  const recorded = readJson(join(opts.agentDir ?? agentDir(), "ultimate-pi-launch.json"))?.sourceRoot;
   const candidates = [
-    fromEnv,
-    join(homedir(), "Documents/UltimatePI/ultimate-pi"),
+    env.ULTIMATE_PI_ROOT?.trim(),
+    typeof recorded === "string" && recorded ? recorded : undefined,
     fileURLToPath(new URL("..", import.meta.url)),
   ].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
@@ -275,6 +280,10 @@ export function findUltimatePiSource(): string | null {
     if (manifest?.name === "ultimate-pi") return resolve(candidate);
   }
   return null;
+}
+
+export function autoUpdateEnabled(env = process.env): boolean {
+  return env.ULTIMATE_PI_AUTO_UPDATE === "1";
 }
 
 function hashTree(root: string): string {
@@ -338,7 +347,7 @@ async function syncSource(dir: string, options: { skipTests: boolean }): Promise
   // copy while one is alive: the test run is a second Node process, and the
   // copy reloads Pi under the pane.
   if (runningSubagentCount() > 0) return SUBAGENT_SYNC_DEFER;
-  const source = findUltimatePiSource();
+  const source = findUltimatePiSource({ agentDir: dir });
   if (!source) return "no Ultimate PI checkout to sync";
   const next = hashTree(source);
   const statePath = join(dir, "ultimate-pi-launch.json");
@@ -354,7 +363,7 @@ async function syncSource(dir: string, options: { skipTests: boolean }): Promise
   if ("deferred" in copied) return copied.deferred;
   const skipped = copied.skipped;
   const previous = readJson(statePath) ?? {};
-  writeFileSync(statePath, `${JSON.stringify({ ...previous, hash: next, at: new Date().toISOString() }, null, 2)}\n`);
+  writeFileAtomicSync(statePath, `${JSON.stringify({ ...previous, hash: next, at: new Date().toISOString() }, null, 2)}\n`);
   const note = "synced Ultimate PI checkout into the agent dir";
   if (skipped.length === 0) return note;
   return `${note}; left non-factory files out of extensions/: ${skipped.join(", ")}`;
@@ -401,6 +410,10 @@ async function updateNpmPackages(dir: string): Promise<string[]> {
       notes[item.index] = `held ${item.name} at ${item.current}; ${item.latest} would drop the patched pin ${PATCH_PINS[item.name]}`;
       continue;
     }
+    if (decision === "apply" && !autoUpdateEnabled()) {
+      notes[item.index] = `update available: ${item.name} ${item.current} -> ${item.latest}; set ULTIMATE_PI_AUTO_UPDATE=1 to install`;
+      continue;
+    }
     const installCli = piCliInvocation(["install", `npm:${item.name}@${item.latest}`]);
     const installed = await run(installCli.command, installCli.args, dir, 60000);
     const after = installedVersion(dir, item.name);
@@ -441,7 +454,7 @@ export async function runLaunchUpdate(options: { skipNetwork?: boolean; skipTest
       if (npmCheckDue(state?.checkedAt)) {
         notes.push(...(await updateNpmPackages(dir)));
         const current = readJson(statePath) ?? {};
-        writeFileSync(statePath, `${JSON.stringify({ ...current, checkedAt: new Date().toISOString() }, null, 2)}\n`);
+        writeFileAtomicSync(statePath, `${JSON.stringify({ ...current, checkedAt: new Date().toISOString() }, null, 2)}\n`);
       }
     } else if (!options.skipNetwork && agentsRunning && !notes.includes(SUBAGENT_SYNC_DEFER)) {
       const statePath = join(dir, "ultimate-pi-launch.json");
