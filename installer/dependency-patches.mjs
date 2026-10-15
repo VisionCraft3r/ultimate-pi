@@ -18,6 +18,16 @@ export const DEPENDENCY_PATCHES = Object.freeze([
     patch: "pi-cursor-idle-0.5.2.patch",
     before: "fac8964e80770c7003d1c8719c08fd834a723eb3fc4ccb1442d5ef3a57429bed",
     after: "4d05e91ce9b1de36c1289a70a40db91407bf284d93c6c9a2ae9501166dec3b24",
+    supersededBy: "954befc4e657acf7d892a525105a4d65852754223c0d581bc593d9964c597f8c",
+  },
+  {
+    name: "@schultzp2020/pi-cursor",
+    version: "0.5.2",
+    root: "npm/node_modules/@schultzp2020/pi-cursor",
+    target: "dist/proxy/main.js",
+    patch: "pi-cursor-mcp-state-0.5.2.patch",
+    before: "4d05e91ce9b1de36c1289a70a40db91407bf284d93c6c9a2ae9501166dec3b24",
+    after: "954befc4e657acf7d892a525105a4d65852754223c0d581bc593d9964c597f8c",
   },
   {
     name: "@schultzp2020/pi-cursor",

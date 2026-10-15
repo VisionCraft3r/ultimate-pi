@@ -38,6 +38,8 @@ const ALLOWED_BARE_HEX = new Set([
   publicHex("e406d7194f83e1db8228", "ef1d91c6719be5d4437b"),
   publicHex("fac8964e80770c7003d1c8719c08fd83", "4a723eb3fc4ccb1442d5ef3a57429bed"),
   publicHex("4d05e91ce9b1de36c1289a70a40db914", "07bf284d93c6c9a2ae9501166dec3b24"),
+  // pi-cursor 0.5.2 proxy after pi-cursor-mcp-state-0.5.2.patch (SHA-256).
+  publicHex("954befc4e657acf7d892a525105a4d65", "852754223c0d581bc593d9964c597f8c"),
   publicHex("2f8ef422f668e7e8fddfe084f37ebe6e", "e44865ce32c2a981a765bb6c213b2c61"),
   publicHex("e37f908e912ade6eebfc4048e7bc7189", "8597f89f630da9f5c2fca1dd1db45324"),
   publicHex("663479e235ac247211f64e5d6015995d", "8cff04e33726fc639eaa0b1edfe5e6bb"),

@@ -48,7 +48,7 @@ test("scanner permits only the documented exact public image hashes", () => inRe
   const source = await readFile(scanner, "utf8");
   const allowed = [...source.matchAll(/publicHex\("([0-9a-f]+)", "([0-9a-f]+)"\)/g)]
     .map((match) => match[1] + match[2]);
-  assert.equal(allowed.length, 28); // Prior public image hashes, plus the graft settled-handler post-image, six observational-memory trigger images, and the global-model resume patch.
+  assert.equal(allowed.length, 29); // Prior public image hashes, plus the graft settled-handler post-image, six observational-memory trigger images, the global-model resume patch, and the Cursor MCP-state post-image.
   for (const descriptor of DEPENDENCY_PATCHES) {
     assert.ok(allowed.includes(descriptor.before));
     assert.ok(allowed.includes(descriptor.after));

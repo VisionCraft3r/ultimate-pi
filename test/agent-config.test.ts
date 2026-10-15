@@ -8,6 +8,8 @@ import {
   AGENTS_MD_END_MARKER,
   assertThinkingLevel,
   listAgentProfiles,
+  orderModelRefs,
+  pickerLabel,
   replaceFrontmatterField,
   writeAgentModel,
   writeAgentThinking,
@@ -78,4 +80,28 @@ test("a model change updates frontmatter and the marker cell only", () => {
   assert.doesNotMatch(markdown, /cursor\/old/);
   const settings = readFileSync(join(root, "settings.json"), "utf8");
   assert.match(settings, /cursor\/composer-2\.5/);
+});
+
+test("the agent model selector keeps cursor/grok-4.7 intact and scoped first", () => {
+  const ordered = orderModelRefs(
+    ["cursor/grok-4.7", "cursor/composer-2.5"],
+    ["anthropic/claude-opus-5-5", "cursor/composer-2.5", "cursor/grok-4.7"],
+  );
+  assert.deepEqual(ordered.map((entry) => entry.ref), [
+    "cursor/grok-4.7",
+    "cursor/composer-2.5",
+    "anthropic/claude-opus-5-5",
+  ]);
+  assert.equal(ordered[0]?.scoped, true);
+  const labels = ordered.map((entry) => pickerLabel(entry.ref, entry.scoped));
+  assert.equal(new Set(labels).size, labels.length);
+  assert.equal(ordered[labels.indexOf("* cursor/grok-4.7")]?.ref, "cursor/grok-4.7");
+
+  const root = tempAgentDir();
+  writeFileSync(join(root, "agents", "scout.md"), PROFILE);
+  writeAgentModel("scout", "cursor/grok-4.7", root);
+  const profile = readFileSync(join(root, "agents", "scout.md"), "utf8");
+  assert.match(profile, /^model: cursor\/grok-4\.7$/m);
+  assert.match(profile, /^thinking: medium$/m);
+  assert.doesNotMatch(profile, /grok-4\.7:medium/);
 });

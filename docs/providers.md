@@ -65,7 +65,7 @@ OAuth via [`@schultzp2020/pi-cursor`](https://www.npmjs.com/package/@schultzp202
 
 1. Marks the provider as OAuth.
 2. Tells you to run `pi`, then `/login`, complete the Cursor login, and confirm.
-3. On apply, installs `@schultzp2020/pi-cursor@0.5.2` (required for Pi to expose Cursor as a provider). `0.5.3` cannot import `@earendil-works/pi-ai` and aborts launch, so settings merge rewrites any other `pi-cursor` spec to that pin. Run `/login` **after** that package is installed if the first attempt could not see Cursor yet.
+3. On apply, installs `@schultzp2020/pi-cursor@0.5.2` (required for Pi to expose Cursor as a provider). `0.5.3` cannot import `@earendil-works/pi-ai` and aborts launch, so settings merge rewrites any other `pi-cursor` spec to that pin. The install then patches that 0.5.2 proxy so Cursor's MCP-state probe gets the session's `mcp_pi_*` tool list instead of an empty frame. Run `/login` **after** that package is installed if the first attempt could not see Cursor yet.
 
 ## OpenRouter (`openrouter`)
 

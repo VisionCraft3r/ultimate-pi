@@ -57,6 +57,15 @@ test("pi-graft async patch is pinned to the published 0.1.2 preimage", () => {
   assert.equal(follow.supersededBy, stale.after);
   assert.ok(DEPENDENCY_PATCHES.indexOf(follow) > DEPENDENCY_PATCHES.indexOf(graft));
   assert.ok(DEPENDENCY_PATCHES.indexOf(stale) > DEPENDENCY_PATCHES.indexOf(follow));
+  const cursorIdle = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-cursor-idle-0.5.2.patch");
+  const cursorMcp = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-cursor-mcp-state-0.5.2.patch");
+  assert.ok(cursorIdle);
+  assert.ok(cursorMcp);
+  assert.equal(cursorIdle.target, "dist/proxy/main.js");
+  assert.equal(cursorMcp.before, cursorIdle.after);
+  assert.equal(cursorMcp.after, "954befc4e657acf7d892a525105a4d65852754223c0d581bc593d9964c597f8c");
+  assert.equal(cursorIdle.supersededBy, cursorMcp.after);
+  assert.ok(DEPENDENCY_PATCHES.indexOf(cursorMcp) > DEPENDENCY_PATCHES.indexOf(cursorIdle));
   const cursor = DEPENDENCY_PATCHES.find((entry) => entry.patch === "pi-cursor-stale-ctx-0.5.2.patch");
   assert.ok(cursor);
   assert.equal(cursor.version, "0.5.2");

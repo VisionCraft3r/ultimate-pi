@@ -125,6 +125,17 @@ thinking output does not switch the timer phase until real text arrives.
 A locally modified build whose full-file hash differs is skipped, even if it
 already contains some of these changes.
 
+## `pi-cursor-mcp-state-0.5.2.patch`
+
+| | |
+| --- | --- |
+| Package | [`@schultzp2020/pi-cursor`](https://www.npmjs.com/package/@schultzp2020/pi-cursor) **0.5.2** |
+| Target file | `dist/proxy/main.js` |
+| Pre-image SHA-256 | `4d05e91ce9b1de36c1289a70a40db91407bf284d93c6c9a2ae9501166dec3b24` |
+| Post-image SHA-256 | `954befc4e657acf7d892a525105a4d65852754223c0d581bc593d9964c597f8c` |
+
+Applies after the idle patch. Cursor's Grok models send exec field 36 (`mcp_state_exec_args`) before calling tools. The 0.5.2 proxy answered that unknown field with an empty message, and the server closed the KV stream (`Connect error internal: KV stream closed`) so the subagent finished without using `read` or `grep`. The patch replies with the session's `mcp_pi_*` tool list on client field 36. A following `listMcpResourcesExecArgs` gets an empty resource list, and `readMcpResourceExecArgs` gets not-found, so those probes do not close the stream either. A tool-result request keeps the current user text in the lineage check, because that is what the previous turn committed; without it the proxy dropped the checkpoint and Cursor closed the KV stream. Exec field 28 (`subagent_args`), Cursor's own subagent call, is answered with an error telling the model to use those tools. The model for a Pi subagent still comes from the agent profile (`/agents`), passed as `--model` plus a separate `--thinking` flag. npm `0.5.3` is still not installed: it cannot import `@earendil-works/pi-ai`, and the upstream package was removed after Pi 1.1.0.
+
 ## `pi-graft-workspace-stats-0.1.2.patch`
 
 | | |

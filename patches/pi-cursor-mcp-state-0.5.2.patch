@@ -1,0 +1,169 @@
+diff --git a/dist/proxy/main.js b/dist/proxy/main.js
+--- a/dist/proxy/main.js
++++ b/dist/proxy/main.js
+@@ -8830,6 +8830,120 @@
+ * as an empty message on the ExecClientMessage, preventing the server from
+ * waiting indefinitely.
+ */
++function encodeVarint(value) {
++	const out = [];
++	let n = value >>> 0;
++	while (n > 127) {
++		out.push((n & 127) | 128);
++		n >>>= 7;
++	}
++	out.push(n);
++	return out;
++}
++function encodeLen(fieldNo, bytes) {
++	const body = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes);
++	return Uint8Array.from([...encodeVarint((fieldNo << 3) | 2), ...encodeVarint(body.length), ...body]);
++}
++function encodeStringField(fieldNo, text) {
++	return encodeLen(fieldNo, new TextEncoder().encode(text));
++}
++function concatBytes(parts) {
++	const size = parts.reduce((sum, part) => sum + part.length, 0);
++	const out = new Uint8Array(size);
++	let offset = 0;
++	for (const part of parts) {
++		out.set(part, offset);
++		offset += part.length;
++	}
++	return out;
++}
++function readVarint(bytes, offset) {
++	let n = 0;
++	let shift = 0;
++	while (offset < bytes.length && shift <= 28) {
++		const byte = bytes[offset++];
++		n |= (byte & 127) << shift;
++		if ((byte & 128) === 0) return { n, offset };
++		shift += 7;
++	}
++	return { n, offset };
++}
++// ultimate-pi:mcp-state-begin
++function decodeServerIdentifiers(data) {
++	const ids = [];
++	if (!data || data.length === 0) return ids;
++	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
++	let offset = 0;
++	while (offset < bytes.length) {
++		const key = readVarint(bytes, offset);
++		offset = key.offset;
++		const field = key.n >>> 3;
++		const wire = key.n & 7;
++		if (wire === 2) {
++			const len = readVarint(bytes, offset);
++			offset = len.offset;
++			const slice = bytes.subarray(offset, offset + len.n);
++			offset += len.n;
++			if (field === 1) ids.push(new TextDecoder().decode(slice));
++		} else if (wire === 0) {
++			const value = readVarint(bytes, offset);
++			offset = value.offset;
++		} else break;
++	}
++	return ids;
++}
++function encodeMcpStateExecResult(mcpTools, rawArgs, serializeTool) {
++	const wanted = new Set(decodeServerIdentifiers(rawArgs));
++	const groups = new Map();
++	for (const tool of mcpTools ?? []) {
++		const id = tool.providerIdentifier || "pi";
++		if (wanted.size > 0 && !wanted.has(id)) continue;
++		const list = groups.get(id);
++		if (list) list.push(tool);
++		else groups.set(id, [tool]);
++	}
++	const successParts = [];
++	for (const [id, tools] of groups) {
++		const serverParts = [encodeStringField(1, id), encodeStringField(2, id)];
++		for (const tool of tools) serverParts.push(encodeLen(5, serializeTool(tool)));
++		serverParts.push(encodeStringField(7, "connected"));
++		successParts.push(encodeLen(1, concatBytes(serverParts)));
++	}
++	return encodeLen(1, concatBytes(successParts));
++}
++function encodeSubagentUnavailable() {
++	const error = encodeStringField(2, "Cursor-native subagents are not available in this Pi session. Use the mcp_pi_* tools. This session's model was already selected.");
++	return encodeLen(2, error);
++}
++function encodeEmptyMcpResourceList() {
++	return encodeLen(1, new Uint8Array());
++}
++function encodeMcpResourceNotFound(uri) {
++	return encodeLen(4, encodeStringField(1, uri || ""));
++}
++function lineageHistoryForRequest(turns, userText, toolResults, lastRole) {
++	if (toolResults.length > 0 && lastRole === "tool") return [...turns, { userText }];
++	return turns;
++}
++// ultimate-pi:mcp-state-end
++function sendCursorExecPayload(execMsg, fieldNo, payload, sendFrame) {
++	const execClientMsg = create(ExecClientMessageSchema, {
++		id: execMsg.id,
++		execId: execMsg.execId
++	});
++	execClientMsg.$unknown = [{
++		no: fieldNo,
++		wireType: 2,
++		data: payload
++	}];
++	const clientMessage = create(AgentClientMessageSchema, { message: {
++		case: "execClientMessage",
++		value: execClientMsg
++	} });
++	sendFrame(frameConnectMessage(toBinary(AgentClientMessageSchema, clientMessage)));
++	sendExecStreamClose$1(execMsg.id, sendFrame);
++}
++
+ function sendUnknownExecResult(execMsg, sendFrame) {
+ 	const argsField = execMsg.$unknown?.find((f) => f.wireType === 2 && f.no !== 1 && f.no !== 15 && f.no !== 19);
+ 	if (!argsField) {
+@@ -8986,9 +9100,34 @@
+ 	}
+ 	if (execCase === "diagnosticsArgs") {
+ 		sendExecResult(execMsg, "diagnosticsResult", create(DiagnosticsResultSchema, {}), sendFrame);
++		return;
++	}
++	if (execCase === "listMcpResourcesExecArgs") {
++		sendCursorExecPayload(execMsg, 17, encodeEmptyMcpResourceList(), sendFrame);
++		console.warn("[tool-dispatch] answered list mcp resources", { id: execMsg.id });
++		return;
++	}
++	if (execCase === "readMcpResourceExecArgs") {
++		const uri = execMsg.message.value?.uri || "";
++		sendCursorExecPayload(execMsg, 18, encodeMcpResourceNotFound(uri), sendFrame);
++		console.warn("[tool-dispatch] answered read mcp resource", { id: execMsg.id });
+ 		return;
+ 	}
+ 	if (state) state.totalExecCount++;
++	const unknownField = execMsg.$unknown?.find((field) => field.wireType === 2 && field.no !== 1 && field.no !== 15 && field.no !== 19);
++	if (unknownField?.no === 36) {
++		sendCursorExecPayload(execMsg, 36, encodeMcpStateExecResult(mcpTools, unknownField.data, (tool) => toBinary(McpToolDefinitionSchema, tool)), sendFrame);
++		console.warn("[tool-dispatch] answered mcp state exec", {
++			id: execMsg.id,
++			tools: mcpTools?.length ?? 0
++		});
++		return;
++	}
++	if (unknownField?.no === 28) {
++		sendCursorExecPayload(execMsg, 28, encodeSubagentUnavailable(), sendFrame);
++		console.warn("[tool-dispatch] rejected cursor subagent exec", { id: execMsg.id });
++		return;
++	}
+ 	sendUnknownExecResult(execMsg, sendFrame);
+ }
+ /**
+@@ -11203,7 +11342,8 @@
+ 		}
+ 		closeBridge(sessionId);
+ 	}
+-	const { conversation: stored, lineageInvalidated } = resolveSession(sessionId, convConfig, turns);
++	const lastRole = messages.at(-1)?.role;
++	const { conversation: stored, lineageInvalidated } = resolveSession(sessionId, convConfig, lineageHistoryForRequest(turns, userText, toolResults, lastRole));
+ 	logSessionCreate(sessionId, requestId, {
+ 		sessionKey: deriveBridgeKey(sessionId),
+ 		conversationKey: deriveConvKey(sessionId)
