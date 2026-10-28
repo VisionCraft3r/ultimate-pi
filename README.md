@@ -139,7 +139,7 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
    a local heuristic fallback if you skip it.
 6. **Observational memory** (optional) — a DeepSeek key to enable a lightweight
    session observer/consolidator.
-7. **Packages** — required pi-lens, pi-graft, `@spences10/pi-themes`, pi-context-view, and `@lucascardozo/pi-edit-guard`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset. A separate question asks whether to install the BMAD bridge (`git:github.com/VisionCraft3r/ultimate-pi-bmad`). The default is no, and `--yes` does not select it.
+7. **Packages** — required pi-lens, pi-graft, `@spences10/pi-themes`, pi-context-view, and `@lucascardozo/pi-edit-guard`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset. A separate question asks whether to install the BMAD bridge (`git:github.com/VisionCraft3r/ultimate-pi-bmad`). The default is no, and `--yes` does not select it. `ultimate-pi setup packages` runs this step again later. `--yes` still leaves the bridge out unless `answers.packages` names that spec.
 8. **Apply** — installs packages, rewrites Pi's host modules on those
    extensions from `dependencies` to `peerDependencies` `"*"` (and deletes the
    nested copies), merges `settings.json`, `auth.json`, and (for a local
@@ -281,7 +281,7 @@ the parent sees the spec. See
 
 ```
 ultimate-pi [install] [flags]
-ultimate-pi setup <providers|agents|fallbacks|jev|memory|web-search|extras> [flags]
+ultimate-pi setup <providers|agents|fallbacks|jev|memory|packages|web-search|extras> [flags]
 ultimate-pi doctor [flags]
 ultimate-pi uninstall [flags]
 

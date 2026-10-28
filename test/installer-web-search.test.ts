@@ -122,7 +122,7 @@ test("managed template hardening is before cache discipline and setup topic is p
   assert.ok(heading > text.indexOf("<!-- ultimate-pi:begin -->"));
   assert.ok(heading < text.indexOf("## Cache discipline"));
   assert.ok(heading < text.indexOf("<!-- ultimate-pi:end -->"));
-  assert.ok(text.includes("jev|memory|web-search|extras"));
+  assert.ok(text.includes("jev|memory|packages|web-search|extras"));
 });
 
 test("worker profile grants every browser tool and passes lint", async () => {

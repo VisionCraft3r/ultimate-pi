@@ -10,8 +10,8 @@ import { fileURLToPath } from "node:url";
 export const MANAGED_BEGIN = "<!-- ultimate-pi:begin -->";
 export const MANAGED_END = "<!-- ultimate-pi:end -->";
 
-/** Bytes of the current template block. Ratcheted after the session-audit hardening section. */
-export const CONTEXT_BUDGET_BYTES = 17408;
+/** Bytes of the current template block. Ratcheted when the block names `setup packages`. */
+export const CONTEXT_BUDGET_BYTES = 17417;
 
 export function managedBlockBytes(text) {
   const begin = text.indexOf(MANAGED_BEGIN);

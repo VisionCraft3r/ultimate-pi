@@ -18,6 +18,8 @@ ultimate-pi setup agents
 ultimate-pi setup fallbacks
 ultimate-pi setup jev
 ultimate-pi setup memory
+ultimate-pi setup packages
+ultimate-pi setup web-search
 ultimate-pi setup extras
 ```
 
@@ -166,13 +168,15 @@ A package update does not write that profile. `ultimate-pi setup agents` or a ne
 
 | Command | What it does |
 |---|---|
-| `ultimate-pi install` | Full walkthrough (preflight → providers → agents → fallbacks → JEV → memory → extras → apply → doctor) |
+| `ultimate-pi install` | Full walkthrough (preflight → providers → agents → fallbacks → JEV → memory → packages → web-search → extras → apply → doctor) |
 | `ultimate-pi setup providers` | Select providers and capture OAuth/keys |
 | `ultimate-pi setup agents` | Assign models to scout/worker/planner/researcher/qa_tester/reviewer and render `agents/*.md` plus the managed `AGENTS.md` block |
 | `ultimate-pi setup fallbacks` | Per-provider 429 chains and per-agent overrides |
-| `ultimate-pi setup jev` | OpenRouter key for live JEV (else heuristic) |
-| `ultimate-pi setup memory` | Optional DeepSeek key / observational memory |
-| `ultimate-pi setup extras` | macOS-only conveniences (iTerm2 status line, completion beep); a no-op on other platforms. Optional packages are installed during install / JEV / memory setup, not here. |
+| `ultimate-pi setup jev` | OpenRouter key for live JEV (else heuristic). Also runs the package step, including the BMAD question. |
+| `ultimate-pi setup memory` | Optional DeepSeek key / observational memory. Also runs the package step, including the BMAD question. |
+| `ultimate-pi setup packages` | Required and optional packages, then the separate BMAD question. `--yes` does not install the bridge unless `answers.packages` names `git:github.com/VisionCraft3r/ultimate-pi-bmad`. |
+| `ultimate-pi setup web-search` | Optional Tavily key for `web_search`, stored under the agent directory |
+| `ultimate-pi setup extras` | macOS-only conveniences (iTerm2 status line, completion beep); a no-op on other platforms. This command does not install optional packages. |
 | `ultimate-pi doctor` | Self-check only |
 | `ultimate-pi uninstall` | Removes the managed AGENTS.md block, marked agent profiles, and the Ultimate Pi self package. Does **not** delete `auth.json`, `model-agents.json`, third-party packages, or backups. |
 | `ultimate-pi uninstall --full` / `--purge` | Also removes `model-agents.json` and third-party packages Ultimate Pi installed (pi-lens, pi-graft, `@spences10/pi-themes`, pi-context-view, `@lucascardozo/pi-edit-guard`, pi-interactive-subagents, plannotator, pi-cache-graph, and related). Never deletes `auth.json`. Prints remaining backup paths so you can delete them manually. |

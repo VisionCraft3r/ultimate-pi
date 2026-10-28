@@ -4,7 +4,8 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { realpathSync } from "node:fs";
 
-const SETUP_TOPICS = ["providers", "agents", "fallbacks", "jev", "memory", "web-search", "extras"];
+import { SETUP_TOPICS } from "../installer/topics.mjs";
+
 const COMMANDS = ["install", "setup", "doctor", "uninstall", "bash-check"];
 
 function usage(code = 0) {

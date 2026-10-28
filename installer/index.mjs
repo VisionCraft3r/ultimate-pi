@@ -6,7 +6,8 @@ import { preflight } from "./preflight.mjs";
 import { collectProviders, yesModeAuthError } from "./providers.mjs";
 import { assignAgentModels } from "./agents.mjs";
 import { configureFallbacks } from "./fallbacks.mjs";
-import { configurePackagesAndKeys } from "./packages.mjs";
+import { BMAD_PACKAGE, configurePackagesAndKeys } from "./packages.mjs";
+import { SETUP_TOPICS } from "./topics.mjs";
 import { configureWebSearchKey } from "./web-search-key.mjs";
 import { mergeCredentials, readAuth } from "./auth-store.mjs";
 import { mergeModelsJson } from "./models-json.mjs";
@@ -122,16 +123,14 @@ export async function install(rawOptions) {
     }
   }
 
-  log(options, "\nInstall complete. Re-run any step with: ultimate-pi setup <providers|agents|fallbacks|jev|memory|web-search|extras>");
+  log(options, `\nInstall complete. Re-run any step with: ultimate-pi setup <${SETUP_TOPICS.join("|")}>`);
   return 0;
 }
 
-const SETUP_TOPICS = new Set(["providers", "agents", "fallbacks", "jev", "memory", "web-search", "extras"]);
-
 export async function setup(rawOptions) {
   const options = await resolveOptions(rawOptions);
-  if (!SETUP_TOPICS.has(options.setupTopic)) {
-    console.error(`Unknown setup topic: ${options.setupTopic}. One of: ${[...SETUP_TOPICS].join(", ")}`);
+  if (!SETUP_TOPICS.includes(options.setupTopic)) {
+    console.error(`Unknown setup topic: ${options.setupTopic}. One of: ${SETUP_TOPICS.join(", ")}`);
     return 1;
   }
 
@@ -185,13 +184,14 @@ export async function setup(rawOptions) {
       break;
     }
     case "jev":
-    case "memory": {
+    case "memory":
+    case "packages": {
       const { keys, jev, memory, packages } = await configurePackagesAndKeys(options, providers, {});
       const allProviders = [...providers, ...keys];
       if (!options.dryRun) await mergeCredentials(options.agentDir, allProviders);
       log(options, `JEV: ${jev?.mode === "openrouter" ? "configured" : "heuristic fallback mode"}`);
       log(options, `Observational memory: ${memory?.enabled ? "configured" : "not installed"}`);
-      void packages;
+      log(options, `BMAD bridge: ${packages.includes(BMAD_PACKAGE) ? "selected" : "not selected"}`);
       break;
     }
     case "web-search": {

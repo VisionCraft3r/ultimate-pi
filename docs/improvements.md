@@ -48,7 +48,7 @@ bash-guard wraps every bash command it allows. Background pids still in the shel
 
 ## BMAD projects
 
-The BMAD bridge is optional and is not part of a default install. Install asks after the other optional packages: "Install the BMAD bridge? Only if this machine uses BMAD." The default is no, and `--yes` does not select it. A yes installs `git:github.com/VisionCraft3r/ultimate-pi-bmad` and nothing else downloads that tree. `answers.packages` can name that spec. `ultimate-pi setup packages` can add it later.
+The BMAD bridge is optional and is not part of a default install. Install asks after the other optional packages: "Install the BMAD bridge? Only if this machine uses BMAD." The default is no, and `--yes` does not select it. A yes installs `git:github.com/VisionCraft3r/ultimate-pi-bmad` and nothing else downloads that tree. `answers.packages` can name that spec. `ultimate-pi setup packages` runs this package step again, including the BMAD question. `--yes` still does not select the bridge unless `answers.packages` names it.
 
 A v6 install is detected from `_bmad` and `.agents/skills/bmad-agent-*`. The first interactive session asks once: BMAD agents, or Ultimate PI agents. The answer is stored in `{project}/.pi/agent-system` and changes only when you ask, including `/agent-system`.
 
