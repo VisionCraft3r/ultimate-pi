@@ -50,8 +50,10 @@ function readVarint(bytes: Uint8Array, offset: number): { n: number; offset: num
   return { n, offset };
 }
 
-function fieldsOf(bytes: Uint8Array): Array<{ field: number; wire: number; bytes?: Uint8Array; value?: number }> {
-  const out = [];
+type ProtoField = { field: number; wire: number; bytes?: Uint8Array; value?: number };
+
+function fieldsOf(bytes: Uint8Array): ProtoField[] {
+  const out: ProtoField[] = [];
   let offset = 0;
   while (offset < bytes.length) {
     const key = readVarint(bytes, offset);
