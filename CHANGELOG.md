@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0-alpha] — 2026-10-28
+
 ### Added
 
 - **`ultimate-pi setup web-search`.** Optional Tavily key prompt at install, stored at `<agentDir>/extensions/web-search/auth.json`.
