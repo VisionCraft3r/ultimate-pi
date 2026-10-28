@@ -14,6 +14,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unl
 import { homedir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { rewriteHostPeerDeps } from "../installer/host-peer-deps.mjs";
 import { writeFileAtomicSync } from "./atomic-write.ts";
 import { copyExtensionTree } from "./extension-layout.ts";
 
@@ -455,6 +456,10 @@ export async function runLaunchUpdate(options: { skipNetwork?: boolean; skipTest
         notes.push(...(await updateNpmPackages(dir)));
         const current = readJson(statePath) ?? {};
         writeFileAtomicSync(statePath, `${JSON.stringify({ ...current, checkedAt: new Date().toISOString() }, null, 2)}\n`);
+      }
+      const peers = rewriteHostPeerDeps(dir);
+      if (peers.rewritten.length > 0) {
+        notes.push(`moved host packages to peerDependencies: ${peers.rewritten.join(", ")}`);
       }
     } else if (!options.skipNetwork && agentsRunning && !notes.includes(SUBAGENT_SYNC_DEFER)) {
       const statePath = join(dir, "ultimate-pi-launch.json");

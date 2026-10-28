@@ -140,9 +140,11 @@ Re-run any step later, non-interactively with `--yes`, or fully scripted with
 6. **Observational memory** (optional) — a DeepSeek key to enable a lightweight
    session observer/consolidator.
 7. **Packages** — required pi-lens, pi-graft, `@spences10/pi-themes`, pi-context-view, and `@lucascardozo/pi-edit-guard`; optional plannotator (spec review) and pi-cache-graph. Preference defaults (theme, compaction, graft limits) fill only when those keys are unset. A separate question asks whether to install the BMAD bridge (`git:github.com/VisionCraft3r/ultimate-pi-bmad`). The default is no, and `--yes` does not select it.
-8. **Apply** — installs packages, merges `settings.json`, `auth.json`, and
-   (for a local endpoint) `models.json`, with timestamped backups, and splices
-   the routing doc into `AGENTS.md` between marker comments.
+8. **Apply** — installs packages, rewrites Pi's host modules on those
+   extensions from `dependencies` to `peerDependencies` `"*"` (and deletes the
+   nested copies), merges `settings.json`, `auth.json`, and (for a local
+   endpoint) `models.json`, with timestamped backups, and splices the routing
+   doc into `AGENTS.md` between marker comments.
 9. **macOS extras** (darwin only) — completion beep is on by default; iTerm2 status line stays opt-in.
 10. **Doctor** — a self-check summarizing what's configured and what still
     needs attention.
@@ -312,7 +314,13 @@ git checkout, then this package's own install directory. It copies the
 checkout into the agent dir only after that checkout's tests pass. Patch and
 minor npm updates that stay on known pins are reported as notes by default;
 set `ULTIMATE_PI_AUTO_UPDATE=1` to actually install them. Version checks run
-four at a time. Installs stay one at a time. Major bumps stay put. Playwright
+four at a time. Installs stay one at a time. Major bumps stay put. The
+same launch, when no subagent is running, moves Pi's host packages
+(`@earendil-works/pi-*`, the older `@mariozechner/pi-*` names, and `typebox`)
+out of an extension's `dependencies` into `peerDependencies` `"*"` and deletes
+that extension's nested copies. Packages with no `pi` field are left alone.
+That is what stops a second copy of those modules after `remote-pi` 0.7.0,
+which still publishes three of them as dependencies. Playwright
 and the HTML/PDF converters load on first use, not at startup. The daily
 Cursor catalog scan does not hold the prompt. `/ModelAgents` "Scan now" still
 waits for it.

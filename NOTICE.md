@@ -30,6 +30,8 @@ Peer packages (not vendored in this repository):
 
 These remain `peerDependencies`. This package does not vendor them.
 
+Install and parent-session launch also move those names, the older `@mariozechner/pi-*` names, and `@sinclair/typebox` out of another extension's `dependencies` into `peerDependencies` `"*"` when that extension has a `pi` field, and delete the nested copies. That keeps Pi on one copy of each module. See [docs/extensions.md](./docs/extensions.md).
+
 ---
 
 ## Community Pi extensions (inspiration / optional install)

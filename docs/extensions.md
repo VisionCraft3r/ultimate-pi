@@ -56,6 +56,14 @@ The floor lives in `extensions/bash-guard/rules.ts` with a justification, a safe
 
 On session start, after the prompt is up, applies patch and minor npm updates that stay on known pins. Version checks run four at a time. Installs stay one at a time. Major bumps, and packages pinned to a patch (`@schultzp2020/pi-cursor`), are left in place. An update that is ready to apply is reported as a note (`update available: ... set ULTIMATE_PI_AUTO_UPDATE=1 to install`) unless `ULTIMATE_PI_AUTO_UPDATE=1` is set, in which case it installs. It also copies `extensions`, `lib`, `templates`, `skills`, and `patches` from a source checkout only after that checkout's tests pass. `findUltimatePiSource` looks, in order, at `ULTIMATE_PI_ROOT`, the `sourceRoot` that `ultimate-pi install` recorded in `<agentDir>/ultimate-pi-launch.json` when run from a git checkout (`installer/launch-state.mjs`), then this package's own install directory. Extension files that do not export a factory are not copied. The extension does not assume a home-directory path.
 
+The same parent launch calls `rewriteHostPeerDeps` in `installer/host-peer-deps.mjs` when no subagent is running. It still runs when the daily npm version check is not due. `--sync-only` skips it, and so does a launch while a subagent is running. Install does the same rewrite at the end of package setup (`installer/packages.mjs`), after dependency patches. `--offline` and `--dry-run` skip it. For every package under `<agentDir>/npm/node_modules` that has a `pi` field, these names leave `dependencies` and become `peerDependencies` `"*"`:
+
+- `@earendil-works/pi-agent-core`, `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`
+- `@mariozechner/pi-agent-core`, `@mariozechner/pi-ai`, `@mariozechner/pi-coding-agent`, `@mariozechner/pi-tui`
+- `@sinclair/typebox` and `typebox`
+
+The nested `node_modules` copy of each moved name is deleted. An empty scope directory (`@earendil-works` and the same for the other scopes) is removed with it. Peer entries that were already there, such as `zod`, keep their ranges. A package with no `pi` field is not rewritten. A package whose own name is in that list is not rewritten, so Pi's packages can keep depending on each other. Running it again rewrites nothing. This does not install or remove the extension, and it does not wait for `ULTIMATE_PI_AUTO_UPDATE`. Install prints `Host peer dependencies: <names>` when a manifest changes. Launch adds `moved host packages to peerDependencies: <names>` to its notes. `npm` `remote-pi` 0.7.0 still declares `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox` as dependencies; the rewrite is what stops Pi from loading a second copy of those modules after that package is installed.
+
 ### `wave-diff`
 
 Parent-only `wave_diff`. `action: "mark"` records HEAD and the dirty set under `.pi/wave-mark.json`. `action: "diff"` returns a capped `git diff --stat` plus changed and new files since that mark. The orchestrator passes that diff to the reviewer. A worker does not get this tool.
@@ -91,6 +99,8 @@ Set `ULTIMATE_PI_TRACE=1`, or `"ultimatePiTrace": true` in `<agentDir>/settings.
 ### Installed packages
 
 `pi-context-view` is required and parent-only. `/context` inspects the prompt. It adds no model instructions. `@lucascardozo/pi-edit-guard` is required and is loaded only on child agents that already have `edit` or `write`.
+
+Extensions that still publish Pi's own modules as `dependencies` are rewritten to peers on install and on launch. The list and the skip rules are under [`launch-update`](#launch-update). Pi warns when an extension such as `remote-pi` would load a second `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, or `typebox`.
 
 ### `session-chrome`
 

@@ -60,6 +60,20 @@ ultimate-pi setup extras
 
 Run `pi update` when no session is mid-task, since Ultimate PI subagents run in their own panes and keep the old bundle until restarted.
 
+## Pi warns that an extension loaded its own copy of a host package
+
+**Symptom:** startup or `/reload` warns that `remote-pi` (or another extension) resolved its own `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, `typebox`, or another Pi host package from a nested `node_modules`, instead of the copy Pi already loaded.
+
+**Cause:** that extension's published `package.json` still lists the host package under `dependencies`. npm `remote-pi` 0.7.0 does this for `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`. Node can then load a second copy.
+
+**Fix**
+
+`ultimate-pi install`, and the next parent-session launch while no subagent is running, rewrites those names to `peerDependencies` `"*"` and deletes the nested copies. `--offline`, `--dry-run`, and a launch started with `--sync-only` do not rewrite. Install logs `Host peer dependencies: …` when a manifest changes. Launch adds `moved host packages to peerDependencies: …`.
+
+The rewrite only touches packages that have a `pi` field. It does not edit Pi's own packages, and it does not edit a library that has no `pi` field. A second run changes nothing. It does not wait for `ULTIMATE_PI_AUTO_UPDATE`.
+
+If the warning is still there after a launch note names that extension, quit the session and start `pi` again so the process loads the rewritten tree. The full name list is in [docs/extensions.md](./extensions.md#launch-update).
+
 ## `tmux` is missing (subagents will not spawn)
 
 **Symptom:** `✖ tmux present — required by pi-interactive-subagents`. Scout/worker/planner/researcher/qa_tester/reviewer each need their own tmux pane. Without `tmux`, the six-role team cannot launch (Windows needs WSL; native Windows is not supported).

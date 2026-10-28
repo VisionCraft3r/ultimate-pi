@@ -4,6 +4,25 @@ Operational record of Pi CLI / extension updates applied to local installs. This
 is a run log, not a release changelog — see [CHANGELOG.md](../CHANGELOG.md) for
 package changes.
 
+## 2026-10-28 — One copy of Pi's host packages
+
+Scope: this checkout, and the global `~/.pi/agent` install.
+
+### Cause
+
+Pi warned that `remote-pi` could load a second `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`. npm `remote-pi` is still 0.7.0, and that release still declares those three as `dependencies`, so a normal install nests a private copy under the extension.
+
+### Applied
+
+- `installer/host-peer-deps.mjs` moves host-provided names from an extension's `dependencies` to `peerDependencies` `"*"` and deletes the nested copies. The names are `@earendil-works/pi-agent-core`, `pi-ai`, `pi-coding-agent`, `pi-tui`, the older `@mariozechner/pi-*` packages, `@sinclair/typebox`, and `typebox`.
+- Only a package with a `pi` field is rewritten. A package whose own name is in that list is skipped, so Pi's packages still depend on each other. A package with no `pi` field is skipped. Other peer ranges are kept. A second pass rewrites nothing.
+- `installer/packages.mjs` runs the rewrite after dependency patches. `lib/launch-update.ts` runs it on a parent launch when no subagent is running. Neither path waits on `ULTIMATE_PI_AUTO_UPDATE`.
+- The development lockfile now resolves the four `@earendil-works/pi-*` peers at 1.1.0 inside the existing `^1.0.0` range. Nested packages that 1.0.0 kept under `pi-coding-agent` are hoisted.
+
+### Local agent tree
+
+`~/.pi/agent/npm/node_modules/remote-pi/package.json` already lists `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox` as `peerDependencies` `"*"`. Its nested tree no longer contains `@earendil-works`. The other installed extensions that have a `pi` field (`pi-lens`, `pi-graft`, `pi-context-view`, `pi-cache-graph`, `pi-mcp-adapter`, `@plannotator/pi-extension`, `@lucascardozo/pi-edit-guard`, `@gotgenes/pi-anthropic-auth`) already declared their host packages as peers, so they had nothing to move. `@earendil-works/pi-coding-agent`, `pi-ai`, and `pi-agent-core` still depend on each other; that is the skip rule, not a missed rewrite.
+
 ## 2026-10-15 — Grok subagent stream on Cursor 0.5.2
 
 Scope: global `~/.pi/agent` install and the Ultimate PI checkout. Both share the same Pi CLI and the same `@schultzp2020/pi-cursor@0.5.2` proxy.

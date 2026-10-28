@@ -8,6 +8,7 @@ import { DEPENDENCY_PATCHES, applyDependencyPatch, dependencyPatchApplies } from
 import { applyEditGuardChildGate } from "./edit-guard-child.mjs";
 import { applyScoutChildLaunch } from "./scout-child.mjs";
 import { CURSOR_PACKAGE } from "./settings.mjs";
+import { rewriteHostPeerDeps } from "./host-peer-deps.mjs";
 import { applyStaleBoundaryPatch } from "./stale-boundary.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -290,6 +291,10 @@ export async function configurePackagesAndKeys(
       p.log.warn(`scout child launch skipped: ${scoutLaunch.reason}`);
     } else {
       p.log.info(`scout child launch: ${scoutLaunch.status}`);
+    }
+    const peers = rewriteHostPeerDeps(options.agentDir);
+    if (peers.rewritten.length > 0) {
+      p.log.info(`Host peer dependencies: ${peers.rewritten.join(", ")}`);
     }
   }
 
